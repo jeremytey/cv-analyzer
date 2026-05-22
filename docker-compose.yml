@@ -1,0 +1,72 @@
+services:
+# 1. API Service Container: Handles HTTP requests, CV uploads, and interacts with the database and Redis.
+  api:
+    build: ./api
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DATABASE_URL=postgresql://user:password@db:5432/cv_analyzer
+      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=development
+    volumes:
+      - cv_uploads:/app/uploads
+    networks:
+      - cv_network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+# 2. Worker Service Container: Processes CVs in the background, interacts with the database and Redis, and uses the Google AI API.
+  worker:
+    build: ./worker
+    environment:
+      - DATABASE_URL=postgresql://user:password@db:5432/cv_analyzer
+      - REDIS_URL=redis://redis:6379
+      - GOOGLE_AI_KEY=${GOOGLE_AI_KEY}
+    volumes:
+      - cv_uploads:/app/uploads
+    networks:
+      - cv_network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+# 3. Database Container: Uses PostgreSQL to store CV data and analysis results.
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=cv_analyzer
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d cv_analyzer"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - cv_network
+
+# 4. Redis Container: Provides a caching layer for the application, improving performance and enabling efficient background job processing.
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - cv_network
+
+networks:
+  cv_network:
+    driver: bridge
+
+volumes:
+  cv_uploads:
+  db_data:
