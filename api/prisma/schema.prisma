@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 4 status for analysis jobs of CV
+enum Status {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Analysis {
+  jobId            String    @id @map("job_id") @default(uuid())
+  originalFilename String    @map("original_filename")
+  cvPath           String    @map("cv_path")
+  jobDescription   String    @map("job_description")
+  status           Status    @default(PENDING)
+  matchScore       Decimal?  @map("match_score") @db.Decimal(5, 2)
+  analysisResults  Json?     @map("analysis_results") @db.JsonB
+  errorMessage     String?   @map("error_message")
+  startedAt        DateTime? @map("started_at")
+  completedAt      DateTime? @map("completed_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@map("analyses")
+}
