@@ -1,0 +1,22 @@
+// TypeScript configuration for the API service of the CV Analyzer application when running in development mode. 
+// This configuration specifies the compiler options, including the target JavaScript version, module system, and 
+// other settings to ensure type safety and compatibility with Node.js.
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "removeComments": true,
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "**/*.test.ts"]
+}
