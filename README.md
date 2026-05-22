@@ -61,3 +61,53 @@ Four services orchestrated with Docker Compose:
 | GET | /health | Health check |
 
 ## Project Structure
+cv-analyzer/
+├── docker-compose.yml
+├── .env
+├── .gitignore
+├── api/
+│   ├── Dockerfile
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── prisma/
+│   │   └── schema.prisma
+│   └── src/
+│       ├── server.ts
+│       ├── app.ts
+│       ├── env.ts
+│       ├── routes/
+│       ├── controllers/
+│       ├── services/
+│       ├── repositories/
+│       ├── middlewares/
+│       └── types/
+└── worker/
+├── Dockerfile
+├── requirements.txt
+├── main.py
+└── modules/
+├── pdf_extractor.py
+├── llm_client.py
+└── db_client.py
+
+## Tests
+
+```bash
+# API integration tests
+cd api && npm test
+
+# Worker unit tests
+cd worker && pytest
+```
+
+## Live URL
+
+_To be added on deployment_
+
+## User Feedback Log
+
+_To be added after real user testing_
+
+## License
+
+MIT
