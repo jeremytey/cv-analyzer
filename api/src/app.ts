@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { env } from './env';
 import { logger } from './lib/logger';
+import { AppError } from './lib/app-error';
+import { errorHandler } from './middlewares/error.middleware';
 
 const app = express();
 
@@ -39,6 +41,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+
+
+// Register the extracted, strongly-typed handler as the absolute final catch net
+app.use(errorHandler);
 // -------------------------------------------------------------------------
 // 4. DATA TRANSFORMATION LAYER
 // -------------------------------------------------------------------------
@@ -61,6 +67,11 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   error.statusCode = 404;
   error.isOperational = true; // Classified as a predictable user input state
   next(error);
+});
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  // Leverage the formal AppError class to guarantee operational tracking and type safety
+  next(new AppError(`Resource boundary not found: ${req.method} ${req.originalUrl}`, 404));
 });
 
 // -------------------------------------------------------------------------
