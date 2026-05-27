@@ -5,24 +5,26 @@ import { z } from 'zod';
 
 dotenv.config();
 
-const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z
-    .string()
-    .transform((val) => parseInt(val, 10))
-    .refine((val) => !isNaN(val) && val > 0 && val <= 65535, {
-      message: 'PORT must be a valid port number between 1 and 65535',
-    })
-    .default('3000'),
-  DATABASE_URL: z
-    .string()
-    .url({ message: 'DATABASE_URL must be a valid URL string' })
-    .startsWith('postgresql://', { message: 'DATABASE_URL must be a PostgreSQL connection string' }),
-  REDIS_URL: z
-    .string()
-    .url({ message: 'REDIS_URL must be a valid URL string' })
-    .startsWith('redis://', { message: 'REDIS_URL must be a valid Redis connection string' }),
-});
+const envSchema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    PORT: z
+      .string()
+      .transform((val) => parseInt(val, 10))
+      .default('3000'),
+    DATABASE_URL: z.string().url(),
+    REDIS_URL: z.string().url(),
+    FRONTEND_URL: z.string().url().optional(), // Marked optional here, enforced via refinement below
+  })
+  .superRefine((data, ctx) => {
+    if (data.NODE_ENV === 'production' && !data.FRONTEND_URL) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['FRONTEND_URL'],
+        message: 'FRONTEND_URL is strictly required when NODE_ENV is set to production',
+      });
+    }
+  });
 
 const parseEnv = () => {
   const result = envSchema.safeParse(process.env);
