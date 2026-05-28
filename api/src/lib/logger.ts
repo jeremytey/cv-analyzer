@@ -1,3 +1,4 @@
+// winston structured logging for better log management and analysis
 import winston from 'winston';
 
 export const logger = winston.createLogger({
