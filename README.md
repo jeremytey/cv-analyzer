@@ -82,13 +82,13 @@ cv-analyzer/
 │       ├── middlewares/
 │       └── types/
 └── worker/
-├── Dockerfile
-├── requirements.txt
-├── main.py
-└── modules/
-├── pdf_extractor.py
-├── llm_client.py
-└── db_client.py
+    ├── Dockerfile
+    ├── requirements.txt
+    ├── main.py
+    └── modules/
+        ├── pdf_extractor.py
+        ├── llm_client.py
+        └── db_client.py
 
 ## Tests
 
