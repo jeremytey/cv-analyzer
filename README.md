@@ -28,6 +28,21 @@ Four services orchestrated with Docker Compose:
 
 ## Getting Started
 
+## Local Development (without Docker)
+
+```bash
+# Install API dependencies
+cd api && npm install
+
+# Install and run migrations
+npx prisma migrate dev
+
+# Start API in dev mode
+npm run dev
+```
+
+For the full system with all services, use Docker Compose instead.
+
 ### Prerequisites
 - Docker and Docker Compose installed
 - Google AI API key
@@ -60,7 +75,9 @@ Four services orchestrated with Docker Compose:
 | GET | /analyze/:jobId | Poll for analysis result |
 | GET | /health | Health check |
 
+
 ## Project Structure
+```
 cv-analyzer/
 ├── docker-compose.yml
 ├── .env
@@ -89,6 +106,7 @@ cv-analyzer/
         ├── pdf_extractor.py
         ├── llm_client.py
         └── db_client.py
+```
 
 ## Tests
 
