@@ -18,3 +18,11 @@ export async function getRecordById(jobId: string): Promise<Analysis | null> {
         },
     });
 }
+
+export async function deleteRecordById(jobId: string): Promise<void> {
+    await prisma.analysis.delete({
+        where: { 
+            jobId: jobId 
+        },
+    });
+}
