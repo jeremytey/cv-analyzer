@@ -1,4 +1,4 @@
-import { app } from './app';
+// verifies database and redis connectivity before starting the server
 import { env } from './env';
 import { logger } from './lib/logger';
 import { prisma } from './lib/prisma';

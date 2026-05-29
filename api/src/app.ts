@@ -9,11 +9,19 @@ import { errorHandler } from './middlewares/error.middleware';
 const app = express();
 
 // -------------------------------------------------------------------------
+// 0. INFRASTRUCTURE TOPOLOGY CONFIGURATION
+// -------------------------------------------------------------------------
+// Instructs Express to trust X-Forwarded-* upstream headers so req.ip 
+// evaluates to the authentic client remote address instead of the reverse proxy.
+if (env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1); 
+}
+
+// -------------------------------------------------------------------------
 // 1 & 2. SECURITY LAYERS
 // -------------------------------------------------------------------------
 app.use(helmet());
 app.use(cors({
-  // Consistently enforce the validated, strictly-typed runtime environments
   origin: env.NODE_ENV === 'production' ? env.FRONTEND_URL : '*',
   methods: ['GET', 'POST', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -22,7 +30,6 @@ app.use(cors({
 // -------------------------------------------------------------------------
 // 3. OBSERVABILITY LAYER: HTTP LIFE-CYCLE TELEMETRY
 // -------------------------------------------------------------------------
-// Placed before routes to ensure absolute observability (capturing 404s and 500s)
 app.use((req: Request, res: Response, next: NextFunction) => {
   const startTime = Date.now();
   
@@ -34,21 +41,16 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       url: req.originalUrl,
       status: res.statusCode,
       durationMs: duration,
-      ip: req.ip,
+      ip: req.ip, 
     });
   });
   
   next();
 });
 
-
-
-// Register the extracted, strongly-typed handler as the absolute final catch net
-app.use(errorHandler);
 // -------------------------------------------------------------------------
 // 4. DATA TRANSFORMATION LAYER
 // -------------------------------------------------------------------------
-// Standard JSON parser. Multi-part streams (Multer) are bound at route-level.
 app.use(express.json());
 
 // -------------------------------------------------------------------------
@@ -59,50 +61,15 @@ app.get('/api/v1/health', (req: Request, res: Response) => {
 });
 
 // -------------------------------------------------------------------------
-// 6. RESOURCE CATCH-ALL LAYER (404 ERROR NET)
+// 6. RESOURCE CATCH-ALL LAYER (SINGLE 404 ERROR NET)
 // -------------------------------------------------------------------------
-// Fires sequentially only if the incoming verb/path fails to match the routing matrix above
 app.use((req: Request, res: Response, next: NextFunction) => {
-  const error: any = new Error(`Resource boundary not found: ${req.method} ${req.originalUrl}`);
-  error.statusCode = 404;
-  error.isOperational = true; // Classified as a predictable user input state
-  next(error);
-});
-
-app.use((req: Request, res: Response, next: NextFunction) => {
-  // Leverage the formal AppError class to guarantee operational tracking and type safety
   next(new AppError(`Resource boundary not found: ${req.method} ${req.originalUrl}`, 404));
 });
 
 // -------------------------------------------------------------------------
 // 7. TERMINAL LAYER: CENTRALIZED EXCEPTION DISPATCHER
 // -------------------------------------------------------------------------
-// Must strictly maintain the 4-argument signature to be parsed by Express as an error middleware.
-// File cleanup has been systematically extracted; the worker maintains absolute file lifecycle authority.
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  const statusCode = err.statusCode || 500;
-  const isOperational = err.isOperational || false;
-
-  // Log full failure diagnostics internally via our shared infrastructure logger
-  logger.error({
-    message: err.message,
-    statusCode,
-    isOperational,
-    stack: env.NODE_ENV === 'development' ? err.stack : undefined,
-  });
-
-  if (isOperational) {
-    return res.status(statusCode).json({
-      status: 'error',
-      message: err.message
-    });
-  }
-
-  // Obfuscate strict database deadlocks or runtime infrastructure crashes from client view
-  return res.status(500).json({
-    status: 'error',
-    message: 'An internal server infrastructure failure occurred.'
-  });
-});
+app.use(errorHandler);
 
 export { app };

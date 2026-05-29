@@ -1,3 +1,4 @@
+// all database operations related to the Analysis model 
 import { Analysis } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 
