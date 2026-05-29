@@ -8,11 +8,6 @@ import { initiateAnalysis } from '../services/analyze.service';
 // declaration file to natively augment the global Express namespace.
 type AuthenticatedUploadRequest = Request & { file: Express.Multer.File };
 
-/**
- * @route   POST /api/v1/analyze
- * @desc    Validates multi-part request boundaries and delegates orchestration to the domain service layer
- * @access  Public
- */
 export const triggerAnalysis = async (
   req: Request, 
   res: Response, 
@@ -51,7 +46,6 @@ export const triggerAnalysis = async (
       filename: originalFilename,
     });
 
-    // 5. RESOURCE RESPONSE DISPATCH (202 ACCEPTED)
     res.status(202).json({
       status: 'success',
       data: {
