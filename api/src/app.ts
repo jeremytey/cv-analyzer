@@ -5,14 +5,13 @@ import { env } from './env';
 import { logger } from './lib/logger';
 import { AppError } from './lib/app-error';
 import { errorHandler } from './middlewares/error.middleware';
+import analyzeRoutes from './routes/analyze.routes';
 
 const app = express();
 
 // -------------------------------------------------------------------------
 // 0. INFRASTRUCTURE TOPOLOGY CONFIGURATION
 // -------------------------------------------------------------------------
-// Instructs Express to trust X-Forwarded-* upstream headers so req.ip 
-// evaluates to the authentic client remote address instead of the reverse proxy.
 if (env.NODE_ENV === 'production') {
   app.set('trust proxy', 1); 
 }
@@ -41,7 +40,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       url: req.originalUrl,
       status: res.statusCode,
       durationMs: duration,
-      ip: req.ip, 
+      ip: req.ip,
     });
   });
   
@@ -59,6 +58,9 @@ app.use(express.json());
 app.get('/api/v1/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'healthy', timestamp: new Date() });
 });
+
+// Mount domain routes with standard API orchestration prefix path
+app.use('/api/v1', analyzeRoutes);
 
 // -------------------------------------------------------------------------
 // 6. RESOURCE CATCH-ALL LAYER (SINGLE 404 ERROR NET)
