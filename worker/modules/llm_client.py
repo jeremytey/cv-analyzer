@@ -8,19 +8,24 @@ from google.genai import types
 
 logger = logging.getLogger("worker.llm_client")
 
-# 1. Define the Strict Structural Contract for Database JsonB Matching
+# --- 1. True Feature Schema Alignment (Fixes Issue 3) ---
+class BulletPointRewrite(BaseModel):
+    original: str = Field(
+        description="The original weak or unoptimized bullet point extracted from the candidate's CV."
+    )
+    rewritten: str = Field(
+        description="The upgraded bullet point embedded with clear metrics, action verbs, and missing target keywords."
+    )
+    justification: str = Field(
+        description="1-sentence explanation of why this change makes the candidate more competitive for this role."
+    )
+
 class AnalysisStructure(BaseModel):
-    suitability_summary: str = Field(
-        description="A senior engineering leadership summary explaining why or why not the candidate fits."
+    keyword_gaps: List[str] = Field(
+        description="Specific critical hard tools, frameworks, concepts, or methodologies required by the job but missing from the CV."
     )
-    key_strengths: List[str] = Field(
-        description="Top 3 distinct technical advantages or matching capabilities found in the candidate's history."
-    )
-    gaps_identified: List[str] = Field(
-        description="Frictions, missing tooling, or lack of depth relative to the core job description requirements."
-    )
-    recommended_interview_questions: List[str] = Field(
-        description="3 highly specific, deep technical or behavioral questions tailored to pressure-test their identified gaps."
+    rewritten_bullet_points: List[BulletPointRewrite] = Field(
+        description="A list of targeted optimizations for their existing experience bullets to explicitly close the identified gaps."
     )
 
 class MasterOutputSchema(BaseModel):
@@ -30,30 +35,28 @@ class MasterOutputSchema(BaseModel):
     detailed_analysis: AnalysisStructure
 
 
+# --- 2. Single Global Initialization (Correct Module Scope Lifecycle) ---
+try:
+    client = genai.Client()
+    logger.info("✅ Gemini SDK Client successfully initialized at module level.")
+except Exception as init_err:
+    logger.critical(f"Failed to initialize Gemini SDK client wrapper: {str(init_err)}")
+    raise
+
+
 def generate_analysis(cv_text: str, job_description: str) -> dict:
     """
     Dispatches extracted CV text and target job specifications to Gemini-2.5-flash.
-    Enforces a strict Pydantic output schema to guarantee clean database insertion layouts.
-    
-    :param cv_text: Raw string stream extracted from the candidate's PDF.
-    :param job_description: Target position requirements and context.
-    :return: Dict containing 'match_score' (float) and 'analysis_results' (dict).
+    Enforces the exact feature contract schema required by the core application spec.
     """
-    # Defensive Context Guardrails
     if not cv_text.strip() or not job_description.strip():
         raise ValueError("LLM execution boundary failed. Context payloads cannot be empty strings.")
 
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise RuntimeError("CRITICAL: GEMINI_API_KEY variable is missing from the environment configuration.")
-
-    # Instantiate the modern SDK client wrapper
-    client = genai.Client(api_key=api_key)
-
     system_instruction = (
         "You are an expert Executive Technical Recruiter and Principal Staff Engineer. "
-        "Your task is to ruthlessly and accurately evaluate a candidate's CV text against a targeted job description. "
-        "Be highly objective. Do not inflate capabilities. Grade strictly based on visible, verifiable experience."
+        "Your job is to run a brutal gap analysis on a CV against a target job description. "
+        "Identify precise technical keyword gaps and provide high-impact, metrics-driven bullet point rewrites "
+        "that showcase the candidate's capabilities using the X-Y-Z formula (Accomplished [X] as measured by [Y], by doing [Z])."
     )
 
     prompt = f"""
@@ -66,25 +69,19 @@ def generate_analysis(cv_text: str, job_description: str) -> dict:
     CANDIDATE CV TEXT:
     {cv_text}
     ---
-    
-    Calculate a realistic match score from 0.00 to 100.00 where:
-    - 90.00+ means perfect architectural match, possessing almost every single requirement.
-    - 70.00-89.00 means high substance capability with minor tool stack adjustments needed.
-    - Below 70.00 means substantial foundational or skill frictions exist.
     """
 
     try:
         logger.info("Dispatching context payloads to Gemini extraction engine...")
 
-        # 2. Fire request with native structured generation configurations
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
-                temperature=0.2,  # Low temperature forces deterministic, analytical matching
+                temperature=0.2,
                 response_mime_type="application/json",
-                response_schema=MasterOutputSchema,
+                response_schema=MasterOutputSchema, 
             ),
         )
 
@@ -92,10 +89,8 @@ def generate_analysis(cv_text: str, job_description: str) -> dict:
         if not raw_text:
             raise RuntimeError("Gemini network transaction returned an empty response stream block.")
 
-        # 3. Unpack string stream into structured Python dictionaries
         structured_data = json.loads(raw_text)
         
-        # Standardize outer dictionary layout to match our worker's processing contract perfectly
         return {
             "match_score": float(structured_data.get("match_score", 0.0)),
             "analysis_results": structured_data.get("detailed_analysis", {})
