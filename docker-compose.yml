@@ -1,73 +1,82 @@
 # define 4 services for testing, development, and production environments
+version: '3.8'
 services:
-# 1. API Service Container: Handles HTTP requests, CV uploads, and interacts with the database and Redis.
-  api:
-    build: ./api
-    ports:
-      - "3000:3000"
-    environment:
-      - PORT=3000
-      - DATABASE_URL=postgresql://user:password@db:5432/cv_analyzer
-      - REDIS_URL=redis://redis:6379
-      - NODE_ENV=development
-    volumes:
-      - cv_uploads:/app/uploads
-    networks:
-      - cv_network
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
-
-# 2. Worker Service Container: Processes CVs in the background, interacts with the database and Redis, and uses the Google AI API.
-  worker:
-    build: ./worker
-    environment:
-      - DATABASE_URL=postgresql://user:password@db:5432/cv_analyzer
-      - REDIS_URL=redis://redis:6379
-      - GOOGLE_AI_KEY=${GOOGLE_AI_KEY}
-    volumes:
-      - cv_uploads:/app/uploads
-    networks:
-      - cv_network
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
-
-# 3. Database Container: Uses PostgreSQL to store CV data and analysis results.
+  # --- Database Layer ---
   db:
     image: postgres:16-alpine
+    container_name: cv_analyzer_db
+    restart: always
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=cv_analyzer
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: cv_analyzer
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U user -d cv_analyzer"]
       interval: 5s
       timeout: 5s
       retries: 5
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    networks:
-      - cv_network
 
-# 4. Redis Container: Provides a caching layer for the application, improving performance and enabling efficient background job processing.
+  # --- In-Memory Queue Layer ---
   redis:
     image: redis:7-alpine
+    container_name: cv_analyzer_redis
+    restart: always
     ports:
       - "6379:6379"
-    networks:
-      - cv_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-networks:
-  cv_network:
-    driver: bridge
+  # --- NestJS Core API Service ---
+  backend:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: cv_analyzer_backend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://user:password@db:5432/cv_analyzer?sslmode=disable
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_QUEUE_NAME=cv_analysis_queue
+    volumes:
+      - shared_uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # --- Python Async Worker Service ---
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    container_name: cv_analyzer_worker
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://user:password@db:5432/cv_analyzer?sslmode=disable
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_QUEUE_NAME=cv_analysis_queue
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - shared_uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
-  cv_uploads:
-  db_data:
+  postgres_data:
+    driver: local
+  shared_uploads:
+    driver: local
