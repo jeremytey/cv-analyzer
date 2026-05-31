@@ -1,30 +1,61 @@
-# db interaction module for worker processes, utilizing a persistent threaded connection pool for efficient database operations.
 import json
 import os
 import logging
 from datetime import datetime
 from psycopg2 import pool  # type: ignore
 
-# Initialize structured logging module configuration
 logger = logging.getLogger("worker.db_client")
 
-# 1. Establish a Single Persistent Threaded Connection Pool at boot time
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("CRITICAL: DATABASE_URL environment variable is missing from the environment configuration.")
 
 try:
-    # Maintain a minimum of 1 idle connection and scale to a maximum of 5 active connections per worker process
     db_pool = pool.ThreadedConnectionPool(1, 5, dsn=DATABASE_URL)
     logger.info("✅ PostgreSQL Threaded Connection Pool successfully initialized.")
 except Exception as init_err:
     logger.critical(f"Failed to initialize PostgreSQL connection pool: {str(init_err)}")
     raise
 
-def update_analysis_result(job_id: str, payload: dict) -> bool:
+def start_processing_job(job_id: str, started_at: datetime) -> bool:
     """
-    Borrows a connection from the persistent pool to save final analysis results.
-    Propagates exceptions upward to ensure processing failures are never silently swallowed.
+    Transitions the resume status to PROCESSING and timestamps exactly when the worker 
+    popped the job off the Redis queue. Leaves completed_at untouched.
+    """
+    query = """
+        UPDATE analyses
+        SET 
+            status = 'PROCESSING',
+            started_at = %s,
+            updated_at = %s
+        WHERE job_id = %s;
+    """
+    
+    conn = None
+    cursor = None
+    try:
+        conn = db_pool.getconn()
+        cursor = conn.cursor()
+        
+        cursor.execute(query, (started_at, started_at, job_id))
+        conn.commit()
+        return cursor.rowcount > 0
+
+    except Exception as db_err:
+        if conn:
+            conn.rollback()
+        logger.error({"message": f"Failed to transition Job {job_id} to PROCESSING", "job_id": job_id, "error": str(db_err)})
+        raise db_err
+    finally:
+        if cursor: 
+            cursor.close()
+        if conn: 
+            db_pool.putconn(conn)
+
+def finalize_job_analysis(job_id: str, payload: dict) -> bool:
+    """
+    Saves final analysis structures or error states, updates completed_at, 
+    and drains the connection back to the pool. Leaves started_at untouched.
     """
     completed_at = datetime.utcnow()
     
@@ -50,7 +81,6 @@ def update_analysis_result(job_id: str, payload: dict) -> bool:
     conn = None
     cursor = None
     try:
-        # 2. Borrow an active connection stream from the pre-warmed pool
         conn = db_pool.getconn()
         cursor = conn.cursor()
         
@@ -65,19 +95,10 @@ def update_analysis_result(job_id: str, payload: dict) -> bool:
     except Exception as db_err:
         if conn:
             conn.rollback()
-        
-        # Log with explicit structural severity levels instead of raw un-indexed strings
-        logger.error({
-            "message": f"Database transaction execution failed for Job {job_id}",
-            "job_id": job_id,
-            "error": str(db_err)
-        })
-        # Reraise the exception so the orchestrator knows the state update failed
+        logger.error({"message": f"Database finalization execution failed for Job {job_id}", "job_id": job_id, "error": str(db_err)})
         raise db_err
-        
     finally:
-        # 3. Always return the connection back to the pool rather than severing the socket
-        if cursor:
+        if cursor: 
             cursor.close()
-        if conn:
+        if conn: 
             db_pool.putconn(conn)
