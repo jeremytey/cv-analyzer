@@ -1,5 +1,6 @@
 # db interaction module for worker processes, utilizing a persistent threaded connection pool for efficient database operations.
 import json
+import os
 import logging
 from datetime import datetime
 from psycopg2 import pool  # type: ignore

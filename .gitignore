@@ -20,9 +20,6 @@ venv/
 api/uploads/
 worker/uploads/
 
-# Prisma
-api/prisma/migrations/
-
 # Logs
 logs/
 *.log

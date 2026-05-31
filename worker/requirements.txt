@@ -1,6 +1,6 @@
 # libraries for worker service to extract text from CVs, analyze them using LLM, and store results in the database
 redis==5.2.0
-psycopg2==2.9.10
+psycopg2-binary==2.9.10
 pdfplumber==0.11.5
 google-genai==2.2.0
 pydantic==2.10.0

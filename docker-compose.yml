@@ -1,7 +1,4 @@
-# define 4 services for testing, development, and production environments
-version: '3.8'
 services:
-  # --- Database Layer ---
   db:
     image: postgres:16-alpine
     container_name: cv_analyzer_db
@@ -20,7 +17,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # --- In-Memory Queue Layer ---
   redis:
     image: redis:7-alpine
     container_name: cv_analyzer_redis
@@ -33,8 +29,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # --- NestJS Core API Service ---
-  backend:
+  api:
     build:
       context: .
       dockerfile: api/Dockerfile
@@ -47,6 +42,7 @@ services:
       - DATABASE_URL=postgresql://user:password@db:5432/cv_analyzer?sslmode=disable
       - REDIS_URL=redis://redis:6379/0
       - REDIS_QUEUE_NAME=cv_analysis_queue
+      - FRONTEND_URL=http://localhost:3000
     volumes:
       - shared_uploads:/app/uploads
     depends_on:
@@ -55,7 +51,6 @@ services:
       redis:
         condition: service_healthy
 
-  # --- Python Async Worker Service ---
   worker:
     build:
       context: .

@@ -1,5 +1,6 @@
 // verifies database and redis connectivity before starting the server
 import { env } from './env';
+import { app } from './app';
 import { logger } from './lib/logger';
 import { prisma } from './lib/prisma';
 import { redis } from './lib/redis';
