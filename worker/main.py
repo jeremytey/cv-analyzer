@@ -1,54 +1,109 @@
+import os
+import sys
+import time
+import json
 import logging
+import signal
 from datetime import datetime
-from worker.modules.pdf_parser import extract_text_from_pdf
-from worker.modules.llm_client import generate_analysis
-# FIX: Updated top-level imports to pull the explicit lifecycle operations
-from worker.modules.db_client import start_processing_job, finalize_job_analysis
+from redis import Redis
 
+from worker.modules.db_client import start_processing_job, finalize_job_analysis
+from worker.modules.pdf_extractor import extract_text_from_pdf
+from worker.modules.llm_client import generate_analysis
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 logger = logging.getLogger("worker.main")
+
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+QUEUE_NAME = os.environ.get("REDIS_QUEUE_NAME", "cv_analysis_queue")
+
+try:
+    redis_client = Redis.from_url(REDIS_URL, socket_timeout=60, socket_keepalive=True)
+    logger.info(f"✅ Bound successfully to Redis instance. Watching target queue: '{QUEUE_NAME}'")
+except Exception as redis_err:
+    logger.critical(f"Failed to wire worker process to Redis: {str(redis_err)}")
+    sys.exit(1)
+
+keep_running = True
+
+def handle_graceful_shutdown(signum, frame):
+    global keep_running
+    logger.info(f"Received signal {signum}. Shutting down after current job...")
+    keep_running = False
+
+signal.signal(signal.SIGINT, handle_graceful_shutdown)
+signal.signal(signal.SIGTERM, handle_graceful_shutdown)
+
+def start_worker_loop():
+    logger.info("🚀 Worker core actively polling via blocking BRPOP stream operations...")
+    while keep_running:
+        try:
+            job_payload_envelope = redis_client.brpop(QUEUE_NAME, timeout=5)
+            if not job_payload_envelope:
+                continue
+            _, raw_payload_str = job_payload_envelope
+            job_data = json.loads(raw_payload_str)
+
+            job_id = job_data.get("jobId")
+            file_path = job_data.get("cvPath")
+            job_description = job_data.get("jobDescription")
+
+            if not job_id or not file_path or not job_description:
+                logger.error(f"Malformed job dropped: {job_data}")
+                continue
+
+            logger.info(f"📋 Job ID {job_id} acquired.")
+            process_job(job_id, file_path, job_description)
+
+        except json.JSONDecodeError:
+            logger.error("Failed to parse queue message. Not valid JSON.")
+        except Exception as loop_fault:
+            logger.error(f"Loop exception: {str(loop_fault)}")
+            time.sleep(2)
+
+    logger.info("👋 Worker shutdown complete.")
 
 def process_job(job_id: str, file_path: str, job_description: str):
     try:
-        # Step 0: Record startedAt timestamp cleanly
         started_at = datetime.utcnow()
         start_processing_job(job_id, started_at)
         logger.info(f"⚡ Job ID {job_id} transitioned to PROCESSING state.")
 
-        # Step A: Perform document layer content compilation
         cv_text = extract_text_from_pdf(file_path)
-        
-        # Step B: Perform model extraction context mapping
         analysis_payload = generate_analysis(cv_text, job_description)
-        
-        # Step C: Write back success contract
-        success_db_update = {
+
+        finalize_job_analysis(job_id, {
             "status": "COMPLETED",
             "match_score": analysis_payload["match_score"],
             "analysis_results": analysis_payload["analysis_results"],
             "error_message": None
-        }
-        finalize_job_analysis(job_id, success_db_update)
-        logger.info(f"🏆 Job ID {job_id} completely processed and recorded successfully.")
+        })
+        logger.info(f"🏆 Job ID {job_id} complete.")
 
     except (FileNotFoundError, ValueError) as validation_err:
-        logger.warning(f"⚠️ Job validation failure encountered on Job ID {job_id}: {str(validation_err)}")
-        failure_db_update = {
+        logger.warning(f"⚠️ Validation failure on Job ID {job_id}: {str(validation_err)}")
+        finalize_job_analysis(job_id, {
             "status": "FAILED",
             "match_score": 0.0,
             "analysis_results": None,
             "error_message": str(validation_err)
-        }
-        finalize_job_analysis(job_id, failure_db_update)
+        })
 
     except Exception as system_err:
-        logger.error(f"💥 Critical infrastructure collapse processing Job ID {job_id}: {str(system_err)}", exc_info=True)
-        error_db_update = {
-            "status": "FAILED",
-            "match_score": 0.0,
-            "analysis_results": None,
-            "error_message": "An unexpected server infrastructure error occurred during resume processing."
-        }
+        logger.error(f"💥 System failure on Job ID {job_id}: {str(system_err)}", exc_info=True)
         try:
-            finalize_job_analysis(job_id, error_db_update)
+            finalize_job_analysis(job_id, {
+                "status": "FAILED",
+                "match_score": 0.0,
+                "analysis_results": None,
+                "error_message": "Unexpected server error during processing."
+            })
         except Exception as db_fatal_err:
-            logger.critical(f"Database sync blocked: {str(db_fatal_err)}")
+            logger.critical(f"Cannot write failure state for Job {job_id}: {str(db_fatal_err)}")
+
+if __name__ == "__main__":
+    start_worker_loop()
