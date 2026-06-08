@@ -11,8 +11,10 @@ const router = Router();
 // -------------------------------------------------------------------------
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // Writes directly to the shared Docker volume path mapped in Docker Compose
-    cb(null, '/app/uploads');
+    const uploadDir = process.env.NODE_ENV === 'test' 
+      ? path.join(__dirname, '../../uploads-test')
+      : '/app/uploads';
+    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     const uniquePrefix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;

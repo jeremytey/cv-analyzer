@@ -20,6 +20,7 @@ venv/
 # Uploads
 api/uploads/
 worker/uploads/
+uploads-test/
 
 # Logs
 logs/

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { beforeAll, afterEach, afterAll } from '@jest/globals';
+import { redis } from '../src/lib/redis';
 
 export const prisma = new PrismaClient();
 
@@ -13,4 +14,5 @@ afterEach(async () => {
 
 afterAll(async () => {
   await prisma.$disconnect();
+  redis.disconnect();
 });
