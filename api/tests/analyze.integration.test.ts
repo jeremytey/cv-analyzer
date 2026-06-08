@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import request from 'supertest';
 import path from 'path';
-import { app } from '../src/app';
+import { server } from './setup';
 import { prisma } from './setup';
 import { describe, expect, test} from '@jest/globals';
 
@@ -12,7 +12,7 @@ const FIXTURE_IMG = path.resolve(__dirname, 'fixtures/sample.png');
 describe('POST /api/v1/analyze', () => {
 
   test('should return 202 with jobId and PENDING status on valid upload', async () => {
-    const res = await request(app)
+    const res = await request(server)
       .post(ANALYZE_URL)
       .attach('cv', FIXTURE_PDF)
       .field('jobDescription', 'Looking for a Node.js engineer with TypeScript and PostgreSQL experience.');
@@ -25,7 +25,7 @@ describe('POST /api/v1/analyze', () => {
   });
 
   test('should return 400 when no file is attached', async () => {
-    const res = await request(app)
+    const res = await request(server)
       .post(ANALYZE_URL)
       .field('jobDescription', 'Node.js engineer role.');
 
@@ -34,7 +34,7 @@ describe('POST /api/v1/analyze', () => {
   });
 
   test('should return 400 when jobDescription is missing', async () => {
-    const res = await request(app)
+    const res = await request(server)
       .post(ANALYZE_URL)
       .attach('cv', FIXTURE_PDF);
 
@@ -43,7 +43,7 @@ describe('POST /api/v1/analyze', () => {
   });
 
   test('should return 400 when jobDescription is an empty string', async () => {
-    const res = await request(app)
+    const res = await request(server)
       .post(ANALYZE_URL)
       .attach('cv', FIXTURE_PDF)
       .field('jobDescription', '   ');
@@ -53,7 +53,7 @@ describe('POST /api/v1/analyze', () => {
   });
 
   test('should return 400 when file type is not PDF or Word document', async () => {
-    const res = await request(app)
+    const res = await request(server)
       .post(ANALYZE_URL)
       .attach('cv', FIXTURE_IMG)
       .field('jobDescription', 'Node.js engineer role.');
@@ -68,7 +68,7 @@ describe('GET /api/v1/analyze/:jobId', () => {
 
   test('should return 404 for a jobId that does not exist', async () => {
     const fakeId = crypto.randomUUID();
-    const res = await request(app).get(`${ANALYZE_URL}/${fakeId}`);
+    const res = await request(server).get(`${ANALYZE_URL}/${fakeId}`);
 
     expect(res.status).toBe(404);
     expect(res.body.status).toBe('error');
@@ -83,7 +83,7 @@ describe('GET /api/v1/analyze/:jobId', () => {
       },
     });
 
-    const res = await request(app).get(`${ANALYZE_URL}/${record.jobId}`);
+    const res = await request(server).get(`${ANALYZE_URL}/${record.jobId}`);
 
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('PENDING');
@@ -102,7 +102,7 @@ describe('GET /api/v1/analyze/:jobId', () => {
       },
     });
 
-    const res = await request(app).get(`${ANALYZE_URL}/${record.jobId}`);
+    const res = await request(server).get(`${ANALYZE_URL}/${record.jobId}`);
 
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('PROCESSING');
@@ -136,7 +136,7 @@ describe('GET /api/v1/analyze/:jobId', () => {
       },
     });
 
-    const res = await request(app).get(`${ANALYZE_URL}/${record.jobId}`);
+    const res = await request(server).get(`${ANALYZE_URL}/${record.jobId}`);
 
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('COMPLETED');

@@ -2,8 +2,11 @@
 import Redis from 'ioredis';
 import { env } from '../env';
 
-// Completely safe to consume the validated env object here
 export const redis = new Redis(env.REDIS_URL, {
-  // Fail-fast configuration for transactional API stability under sudden load spikes
-  maxRetriesPerRequest: 3, 
+  maxRetriesPerRequest: 3,
+  ...(env.NODE_ENV === 'test' && {
+    lazyConnect: true,
+    enableOfflineQueue: false,
+    retryStrategy: () => null, // null = don't retry, fail immediately
+  }),
 });
