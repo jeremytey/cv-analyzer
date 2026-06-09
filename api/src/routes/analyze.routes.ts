@@ -28,16 +28,16 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024, // Strict 5MB ceiling constraint
   },
   fileFilter: (req, file, cb) => {
-    if (
-      file.mimetype === 'application/pdf' ||
-      file.mimetype === 'application/msword' ||
-      file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    ) {
-      cb(null, true);
-    } else {
-      cb(new AppError('Invalid file type format. Only PDF and Word documents are permitted.', 400) as any);
-    }
-  },
+  if (
+    file.mimetype === 'application/pdf' ||
+    file.mimetype === 'application/msword' ||
+    file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ) {
+    cb(null, true);
+  } else {
+    cb(new Error('INVALID_FILE_TYPE'));
+  }
+},
 });
 
 // -------------------------------------------------------------------------
@@ -52,17 +52,21 @@ router.post(
   '/analyze',
   (req: Request, res: Response, next: NextFunction) => {
     upload.single('cv')(req, res, (err: any) => {
-      if (err) {
-        if (err instanceof multer.MulterError) {
-          if (err.code === 'LIMIT_FILE_SIZE') {
-            return next(new AppError('File size exceeds the rigid 5MB restriction limit.', 400));
-          }
-          return next(new AppError(`File upload transmission failure: ${err.message}`, 400));
-        }
-        return next(err);
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+        return next(new AppError('File size exceeds the rigid 5MB restriction limit.', 400));
       }
-      next();
-    });
+      return next(new AppError(`File upload transmission failure: ${err.message}`, 400));
+    }
+    // Plain Error from fileFilter
+    if (err.message === 'INVALID_FILE_TYPE') {
+      return next(new AppError('Invalid file type format. Only PDF and Word documents are permitted.', 400));
+    }
+    return next(err);
+  }
+  next();
+});
   },
   triggerAnalysis
 );
