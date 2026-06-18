@@ -1,122 +1,146 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState, useEffect, useRef } from 'react'
+import { IdleView } from './components/IdleView'
+import { ProcessingView } from './components/ProcessingView'
+import { SuccessView } from './components/SuccessView'
+import { ErrorView } from './components/ErrorView'
 
-function App() {
-  const [count, setCount] = useState(0)
+export type UIState = 'IDLE' | 'PROCESSING' | 'SUCCESS' | 'ERROR'
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+export interface BulletRewrite {
+  original: string
+  rewritten: string
+  justification: string
 }
 
-export default App
+export interface AnalysisResult {
+  keyword_gaps: string[]
+  rewritten_bullet_points: BulletRewrite[]
+}
+
+export interface SuccessPayload {
+  jobId: string
+  matchScore: number
+  analysisResults: AnalysisResult
+}
+
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
+const POLL_INTERVAL_MS = 2000
+
+export default function App() {
+  const [uiState, setUiState] = useState<UIState>('IDLE')
+  const [jobId, setJobId] = useState<string | null>(null)
+  const [successPayload, setSuccessPayload] = useState<SuccessPayload | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const stopPolling = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+  }
+
+  useEffect(() => {
+    if (!jobId) return
+
+    intervalRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/analyze/${jobId}`)
+        const json = await res.json()
+
+        if (!res.ok) {
+          stopPolling()
+          setErrorMessage(json.message ?? 'Polling request failed.')
+          setUiState('ERROR')
+          return
+        }
+
+        const status: string = json.data.status
+
+        if (status === 'COMPLETED') {
+          stopPolling()
+          setSuccessPayload({
+            jobId: json.data.jobId,
+            matchScore: Number(json.data.matchScore),
+            analysisResults: json.data.analysisResults as AnalysisResult,
+          })
+          setUiState('SUCCESS')
+        } else if (status === 'FAILED') {
+          stopPolling()
+          setErrorMessage(json.data.errorMessage ?? 'Analysis failed.')
+          setUiState('ERROR')
+        }
+        // PENDING and PROCESSING: keep polling
+      } catch {
+        stopPolling()
+        setErrorMessage('Network error. Could not reach the server.')
+        setUiState('ERROR')
+      }
+    }, POLL_INTERVAL_MS)
+
+    return () => stopPolling()
+  }, [jobId])
+
+  const handleSubmit = async (file: File, jobDescription: string) => {
+    setUiState('PROCESSING')
+    setErrorMessage(null)
+    setSuccessPayload(null)
+
+    const formData = new FormData()
+    formData.append('cv', file)
+    formData.append('jobDescription', jobDescription)
+
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/analyze`, {
+        method: 'POST',
+        body: formData,
+      })
+      const json = await res.json()
+
+      if (!res.ok) {
+        setErrorMessage(json.message ?? 'Failed to submit analysis.')
+        setUiState('ERROR')
+        return
+      }
+
+      setJobId(json.data.jobId)
+    } catch {
+      setErrorMessage('Network error. Could not reach the server.')
+      setUiState('ERROR')
+    }
+  }
+
+  const handleReset = () => {
+    stopPolling()
+    setJobId(null)
+    setSuccessPayload(null)
+    setErrorMessage(null)
+    setUiState('IDLE')
+  }
+
+  return (
+    <main className="min-h-screen bg-canvas font-mono flex items-center justify-center p-8">
+      <div className="w-full max-w-4xl">
+        <header className="mb-8">
+          <h1 className="text-6xl font-bold tracking-[-0.03em] text-[#1a1a1a] leading-tight font-sans">
+          cv_analyzer.
+          </h1>
+          <p className="text-xs font-mono text-neutral-400 mt-2 tracking-wide">
+            ats keyword gap analysis + bullet rewriter
+          </p>
+        </header>
+
+        <div className="bg-workspace rounded-3xl p-8">
+          {uiState === 'IDLE' && <IdleView onSubmit={handleSubmit} />}
+          {uiState === 'PROCESSING' && <ProcessingView />}
+          {uiState === 'SUCCESS' && successPayload && (
+            <SuccessView payload={successPayload} onReset={handleReset} />
+          )}
+          {uiState === 'ERROR' && (
+            <ErrorView message={errorMessage} onReset={handleReset} />
+          )}
+        </div>
+      </div>
+    </main>
+  )
+}
