@@ -42,7 +42,7 @@ services:
       - DATABASE_URL=postgresql://user:password@db:5432/cv_analyzer?sslmode=disable
       - REDIS_URL=redis://redis:6379/0
       - REDIS_QUEUE_NAME=cv_analysis_queue
-      - FRONTEND_URL=http://localhost:3000
+      - FRONTEND_URL=http://localhost:5173
     volumes:
       - shared_uploads:/app/uploads
     depends_on:

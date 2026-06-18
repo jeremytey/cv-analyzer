@@ -16,6 +16,7 @@ export default {
         'score-low': '#F5D4D4',
       },
       fontFamily: {
+        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
         mono: ['DM Mono', 'ui-monospace', 'monospace'],
       },
     },
