@@ -8,7 +8,7 @@ from google.genai import types
 
 logger = logging.getLogger("worker.llm_client")
 
-# --- 1. True Feature Schema Alignment (Fixes Issue 3) ---
+# --- 1. True Feature Schema Alignment  ---
 class BulletPointRewrite(BaseModel):
     original: str = Field(
         description="The original weak or unoptimized bullet point extracted from the candidate's CV."
