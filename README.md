@@ -1,6 +1,6 @@
 # CV Analyzer
 
-A polyglot distributed system that helps Malaysian and Singaporean CS students 
+A polyglot distributed system that helps Malaysian CS students 
 identify ATS keyword gaps between their CV and a job description, with 
 copy-paste ready bullet point rewrites.
 
@@ -10,7 +10,7 @@ copy-paste ready bullet point rewrites.
 
 ## Why This Exists
 
-Most CS students in Malaysia and Singapore tailor CVs by gut feel with no 
+Most CS students in Malaysia tailor CVs by gut feel with no 
 signal on whether their CV contains the keywords ATS systems and recruiters 
 actually scan for. When rejected, they have no way to diagnose why.
 
@@ -34,19 +34,19 @@ Selected responses:
 
 > "The most frustrating part is spending a lot of time applying for jobs but 
 > getting little or no response. It can also be difficult to know whether my 
-> CV is good enough or ATS-friendly for the role." — Zi Qian, CS student
+> CV is good enough or ATS-friendly for the role." — Anonymous, CS student
 
 > "I don't send the exact same CV every time. I keep one master CV and spend 
 > 5–10 mins customizing it per application — reordering bullet points, adding 
 > keywords from the job description. The uncertainty and time wasted is the 
-> worst." — Zhi Yong, CS student
+> worst." — Anonymous, CS student
 
 > "My CV is built on Canva, and every time editing certain details requires me 
 > to adjust the overall design, move the text and images, which is a bit 
-> frustrating." — Sanzhar, CS student
+> frustrating." — Anonymous, CS student
 
 > "Many places have 'Drop your Resume' QR codes. In my case, 99% of the time 
-> I will not get any response from the team." — Jagaanathan, CS student
+> I will not get any response from the team." — Anonymous, CS student
 
 > "I tailor my CV depending on the company — mostly changing the skills part 
 > and experience to reflect the relevant skills the company needs." 
@@ -180,23 +180,32 @@ cd worker && pytest
 
 ## Project Structure
 
-cv-analyzer/
+## Project Structure
 
-├── docker-compose.yml
-├── api/                  # Node.js + TypeScript producer API
-│   ├── prisma/
+cv-analyzer/
+├── docker-compose.yml       # Orchestrates local development (DB, Queue, App containers)
+├── .dockerignore            # Excludes global node_modules and virtual environments
+├── .env                     # Contains host environment tokens (e.g., GEMINI_API_KEY)
+│
+├── api/                     # Node.js + TypeScript Producer API
+│   ├── prisma/              # Database schema definition and migrations
 │   └── src/
-│       ├── routes/
-│       ├── controllers/
-│       ├── services/
-│       ├── repositories/
-│       └── middlewares/
-└── worker/               # Python consumer worker
-├── main.py
-└── modules/
-├── pdf_extractor.py
-├── llm_client.py
-└── db_client.py
+│       ├── routes/          # Express route definitions & HTTP endpoints
+│       ├── controllers/     # Request validation and orchestration layer
+│       ├── services/        # Business logic & job publishing to queue
+│       ├── repositories/    # Direct database queries via Prisma Client
+│       └── middlewares/     # Auth, error handling, and file upload interceptors
+│
+├── frontend/                # React + TypeScript + Vite Single Page Application (SPA)
+│   ├── src/                 # Application codebase (Components, Hooks, Styles)
+│   ├── public/              # Static public assets
+│
+└── worker/                  # Python Consumer Worker (Heavy Processing)
+    ├── main.py              # Worker entry point & message queue listener
+    └── modules/
+        ├── pdf_extractor.py # Text parsing and preprocessing from uploaded CVs
+        ├── llm_client.py    # Structured parsing & prompt execution via LLM API
+        └── db_client.py     # Direct data persistence for processing results
 
 ---
 
