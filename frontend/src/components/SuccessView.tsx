@@ -1,4 +1,4 @@
-import { SuccessPayload } from '../App'
+import type { SuccessPayload } from '../App'
 
 interface SuccessViewProps {
   payload: SuccessPayload
