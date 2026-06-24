@@ -69,6 +69,10 @@ Four services orchestrated with Docker Compose:
 | redis | redis:7-alpine | Async job queue between api and worker |
 | db | postgres:16 | Shared persistent store for job state and results |
 
+The LLM system instruction enforces binary keyword evaluation, X-Y-Z bullet 
+formatting, stack diversity auditing, and a 25-word conciseness constraint. 
+Calibrated against Malaysian tech recruiter screening standards.
+
 ### Why async via Redis instead of synchronous LLM calls
 
 PDF extraction plus LLM generation takes 10–30 seconds per request. Calling 

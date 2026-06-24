@@ -15,16 +15,21 @@ class BulletPointRewrite(BaseModel):
     )
     rewritten: str = Field(
         description=(
-            "The upgraded bullet point using the X-Y-Z formula: Accomplished [X] as measured by [Y], by doing [Z]. "
-            "Must explicitly name: (1) what was built or engineered, (2) the specific tech stack used, "
-            "(3) a realistic measurable result — latency in ms, throughput, users served, hours automated, "
-            "cost reduced. No generic phrases. No 'spearheaded robust solutions'. Copy-paste ready."
+            "The upgraded bullet point. Use X-Y-Z: Accomplished [X] as measured by [Y], by doing [Z]. "
+            "Must contain: (1) what was built — specific, not vague, "
+            "(2) the exact technical stack named inline (not in a separate section), "
+            "(3) a realistic measurable outcome — latency in ms, throughput, users, "
+            "test coverage percentage, downloads, cost reduced, hours automated. "
+            "LENGTH CONSTRAINT: Maximum 25 words. Every word must earn its place. "
+            "A candidate must be able to fit this on a one-page CV without reformatting. "
+            "Do not use: 'spearheaded', 'robust', 'passionate', 'team player', or any filler. "
+            "The candidate must be able to defend every metric in an interview."
         )
     )
     justification: str = Field(
         description=(
-            "One sentence. State exactly which missing keyword or signal this rewrite closes, "
-            "and why that signal matters to a Grab, Sea Group, or GoTo recruiter screening for this role."
+            "One sentence, maximum 20 words. Name the exact keyword or signal this rewrite closes "
+            "and why it matters to a Grab, Sea Group, or GoTo recruiter for this specific role."
         )
     )
 
@@ -32,17 +37,42 @@ class BulletPointRewrite(BaseModel):
 class AnalysisStructure(BaseModel):
     keyword_gaps: List[str] = Field(
         description=(
-            "Hard technical keywords, frameworks, tools, or architectural concepts required by the job "
-            "but absent from the CV. Binary evaluation only — present or absent. "
-            "Do not list soft skills. Do not list anything the CV already demonstrates."
+            "Hard technical keywords, frameworks, tools, or architectural concepts "
+            "explicitly required by the job description but absent from the CV. "
+            "Binary evaluation only — present or absent. No partial credit. "
+            "Do not list soft skills. Do not list anything the CV already demonstrates. "
+            "Do not list generic tools like 'Git' unless the job requires them and they are genuinely absent. "
+            "Each gap must be a single term or short phrase, not a sentence."
         )
     )
     rewritten_bullet_points: List[BulletPointRewrite] = Field(
         description=(
             "Targeted rewrites of the candidate's weakest existing bullet points. "
             "Each rewrite must close at least one identified keyword gap. "
-            "Do not invent experience the candidate does not have. "
-            "Elevate what exists — add precision, stack specificity, and measurable outcomes."
+            "Do not fabricate experience the candidate does not have. "
+            "Elevate what exists — add stack specificity, action verbs, measurable outcomes. "
+            "Use varied action verbs across bullets: built, engineered, reduced, automated, "
+            "migrated, optimised, deployed, instrumented, published, shipped. "
+            "Never repeat the same verb twice. "
+            "Stack must be named inline in the bullet, not referenced separately."
+        )
+    )
+    stack_redundancy_warning: str = Field(
+        default="",
+        description=(
+            "If the candidate has used the same core stack across multiple projects "
+            "(e.g., two Node.js + MongoDB REST APIs), write one sentence flagging this. "
+            "State that recruiters at Grab and Sea Group read identical stacks as one skill built twice. "
+            "Name one concrete architectural addition that would demonstrate depth for this role. "
+            "If no redundancy exists, return an empty string."
+        )
+    )
+    one_page_verdict: str = Field(
+        description=(
+            "One sentence assessing whether the CV's bullet points are concise enough for a one-page format. "
+            "Industry standard for internship and fresh graduate applications in Malaysia and Singapore "
+            "is strictly one page. If bullets are verbose or padded, say so and name the worst offender. "
+            "If the CV is already concise, confirm it."
         )
     )
 
@@ -50,9 +80,10 @@ class AnalysisStructure(BaseModel):
 class MasterOutputSchema(BaseModel):
     match_score: float = Field(
         description=(
-            "Overall ATS match percentage, strictly bounded 0.00–100.00. "
+            "ATS match percentage, strictly bounded 0.00–100.00. "
             "Score based on hard keyword coverage of core job requirements only. "
-            "Do not inflate. A score above 80 means the CV is genuinely strong for this role."
+            "Do not inflate. A score above 80 means the CV is genuinely strong for this role. "
+            "A score below 40 means the candidate will likely be filtered before human review."
         )
     )
     detailed_analysis: AnalysisStructure
@@ -83,49 +114,72 @@ def generate_analysis(cv_text: str, job_description: str) -> dict:
 
         "RULE 1 — BINARY KEYWORD EVALUATION:\n"
         "A technical skill is either present in the CV or it is not. "
-        "'Somewhat demonstrated' does not exist. Do not give partial credit. "
-        "If PostgreSQL appears once in a project description, it counts. "
-        "If Docker is not mentioned anywhere, it is a gap. List it.\n\n"
+        "Do not give partial credit. If PostgreSQL appears in a project description, it counts. "
+        "If Docker is not mentioned anywhere, it is a gap. "
+        "Only flag gaps for skills the job description explicitly requires.\n\n"
 
         "RULE 2 — STACK DIVERSITY AUDIT:\n"
-        "If the candidate has built multiple projects using the identical stack "
-        "(e.g., two Node.js + MongoDB REST APIs), flag this as an engineering depth gap. "
-        "Recruiters at Grab and Sea Group read this as one skill built twice, not two projects. "
-        "Recommend replacing the redundant project signal with architecture that demonstrates "
-        "system design awareness: async queues, caching layers, containerisation, CI/CD pipelines, "
-        "or polyglot service boundaries.\n\n"
+        "If the candidate has built multiple projects using the same core stack, "
+        "flag this in stack_redundancy_warning. "
+        "Recruiters at Grab and Sea Group read identical stacks as one skill built twice, not two projects. "
+        "Name one concrete architectural addition for this specific role: "
+        "async queues, distributed caching, containerisation, CI/CD, or polyglot service boundaries.\n\n"
 
         "RULE 3 — BULLET REWRITING STANDARD:\n"
-        "Rewrite using the X-Y-Z formula: Accomplished [X] as measured by [Y], by doing [Z]. "
-        "Every rewritten bullet must contain three elements:\n"
-        "  (1) What was built or engineered — specific, not vague.\n"
-        "  (2) The exact technical stack used to build it.\n"
-        "  (3) A measurable outcome — latency reduction in ms, API throughput, "
-        "number of users, test coverage percentage, CI pipeline time saved, cost reduced.\n"
-        "If the candidate's original bullet mentions AI or automation, "
-        "the rewrite must specify how it was evaluated or validated — even basic test cases count.\n\n"
+        "Format: Accomplished [X] as measured by [Y], by doing [Z]. "
+        "Every rewritten bullet must contain:\n"
+        "  (1) What was built — specific, not vague.\n"
+        "  (2) The exact technical stack named inline in the bullet itself.\n"
+        "  (3) A measurable outcome — latency, throughput, users, downloads, "
+        "test coverage, pipeline time, cost.\n"
+        "LENGTH: Maximum 25 words per bullet. This is a hard limit. "
+        "A candidate must be able to place this on a one-page CV without reformatting. "
+        "Internship and fresh graduate CVs in Malaysia and Singapore are strictly one page. "
+        "Verbose bullets are a formatting failure, not just a style preference.\n"
+        "VERBS: Use a different action verb for each bullet. "
+        "Valid verbs: built, engineered, reduced, automated, migrated, optimised, "
+        "deployed, instrumented, published, shipped, architected, integrated.\n\n"
 
         "RULE 4 — HONESTY OVER INFLATION:\n"
-        "Do not invent metrics the candidate did not demonstrate. "
-        "Do not use phrases like 'spearheaded robust solutions', 'team player', "
-        "'passionate about technology', or any other content-free filler. "
-        "If a metric looks mathematically implausible, drop it and reframe around process instead. "
-        "The output must be honest enough that the candidate can defend every line in an interview.\n\n"
+        "Do not fabricate experience. Do not use filler: "
+        "'spearheaded robust solutions', 'team player', 'passionate about technology'. "
+        "Do not treat calling a third-party API as an engineering skill — "
+        "API consumption is not engineering depth. "
+        "If a metric is implausible or unverifiable, remove it and reframe around process quality. "
+        "The candidate must be able to defend every line in a technical interview.\n\n"
 
         "RULE 5 — SEA MARKET SIGNALS:\n"
-        "Recruiters at Grab, Sea Group, GoTo, and ByteDance SG specifically screen for: "
+        "Grab, Sea Group, GoTo, and ByteDance SG screen specifically for: "
         "type safety (TypeScript, typed Python), testing discipline (unit + integration coverage), "
         "CI/CD awareness, system design signals (async patterns, distributed components, caching), "
-        "and scalability thinking. Weight these signals heavily in your gap analysis and rewrites."
+        "and scalability thinking. "
+        "Weight these signals heavily in gap identification and bullet rewrites.\n\n"
+
+        "RULE 6 — ONE-PAGE DISCIPLINE:\n"
+        "The gold standard for internship CVs is one page. "
+        "Jake Ryan's resume format is the target: each bullet under 25 words, "
+        "stack named inline, metric present, action verb first. "
+        "Assess whether the candidate's existing bullets meet this standard in one_page_verdict. "
+        "If they do not, name the specific bullet that is worst.\n\n"
+
+        "RULE 7 — WHAT GOOD LOOKS LIKE:\n"
+        "Strong bullet: 'Engineered Redis-backed async job queue in Node.js and Python, "
+        "reducing p95 API response time from 28s to 210ms under concurrent load.' (22 words) "
+        "Strong bullet: 'Published Minecraft plugin via TravisCI CD pipeline — "
+        "2K+ downloads, 4.5/5 stars across 200+ reviews.' (17 words) "
+        "Weak bullet: 'Worked on backend APIs using various technologies to improve system performance.' "
+        "Every rewrite must move from weak toward strong."
     )
 
     prompt = f"""
 Audit the candidate CV below against the job description.
 
-Identify every hard technical keyword the job requires that the CV does not demonstrate.
-Flag any stack redundancy across projects.
-Rewrite the candidate's weakest bullet points using the X-Y-Z formula with explicit stack and measurable outcome.
-Do not fabricate experience. Elevate what exists.
+Your tasks:
+1. Identify every hard technical keyword the job requires that the CV does not demonstrate.
+2. Check for stack redundancy across projects. Populate stack_redundancy_warning if found.
+3. Rewrite the candidate's weakest bullet points using X-Y-Z, inline stack, measurable outcome, max 25 words.
+4. Assess one-page discipline in one_page_verdict.
+5. Do not fabricate experience. Elevate what exists with precision, honesty, and conciseness.
 
 ---
 TARGET JOB DESCRIPTION:
