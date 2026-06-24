@@ -1,12 +1,14 @@
 import { useState, useRef, useCallback } from 'react'
 
 interface IdleViewProps {
+  file: File | null
+  setFile: (file: File | null) => void
+  jobDescription: string
+  setJobDescription: (desc: string) => void
   onSubmit: (file: File, jobDescription: string) => void
 }
 
-export function IdleView({ onSubmit }: IdleViewProps) {
-  const [file, setFile] = useState<File | null>(null)
-  const [jobDescription, setJobDescription] = useState('')
+export function IdleView({ file, setFile, jobDescription, setJobDescription, onSubmit }: IdleViewProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)

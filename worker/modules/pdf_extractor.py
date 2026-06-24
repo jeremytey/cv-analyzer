@@ -53,7 +53,10 @@ def extract_text_from_pdf(file_path: str) -> str:
         full_document_text = "\n\n".join(extracted_text_segments).strip()
 
         if not full_document_text:
-            raise ValueError("Failed to extract any machine-readable characters. PDF might be a flattened image scan.")
+            raise ValueError(
+                "[Extraction Failure] No parseable text detected. This PDF appears to be a flat "
+                "scanned image or contains corrupted document metadata layers."
+            )
 
         logger.info(f"✅ Document extraction complete. Successfully processed {total_pages} pages.")
         return full_document_text

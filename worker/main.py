@@ -85,6 +85,7 @@ def process_job(job_id: str, file_path: str, job_description: str):
         logger.info(f"🏆 Job ID {job_id} complete.")
 
     except (FileNotFoundError, ValueError) as validation_err:
+        # Passes targeted [Tag] strings from pdf_extractor and llm_client straight to the DB
         logger.warning(f"⚠️ Validation failure on Job ID {job_id}: {str(validation_err)}")
         finalize_job_analysis(job_id, {
             "status": "FAILED",
@@ -100,7 +101,7 @@ def process_job(job_id: str, file_path: str, job_description: str):
                 "status": "FAILED",
                 "match_score": 0.0,
                 "analysis_results": None,
-                "error_message": "Unexpected server error during processing."
+                "error_message": "[Internal Pipeline Error] An unhandled engineering runtime exception occurred within the processing pipeline."
             })
         except Exception as db_fatal_err:
             logger.critical(f"Cannot write failure state for Job {job_id}: {str(db_fatal_err)}")

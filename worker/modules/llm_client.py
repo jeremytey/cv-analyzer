@@ -5,6 +5,7 @@ from typing import List
 from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
+from google.genai.errors import APIError
 
 logger = logging.getLogger("worker.llm_client")
 
@@ -214,6 +215,22 @@ CANDIDATE CV TEXT:
             "match_score": float(structured_data.get("match_score", 0.0)),
             "analysis_results": structured_data.get("detailed_analysis", {})
         }
+
+    except APIError as api_err:
+        # Isolate transient upstream overload from fatal credential mismatches
+        err_str = str(api_err).lower()
+        if api_err.code == 503 or "overloaded" in err_str or "unavailable" in err_str:
+            raise ValueError(
+                "[Gemini Service Unavailable] Upstream AI engine is currently overloaded with "
+                "concurrent requests. Please wait a few minutes before trying again."
+            )
+        elif api_err.code == 403 or "api key" in err_str or "api_key" in err_str:
+            raise ValueError(
+                "[Gemini Configuration Error] Upstream authentication failure. "
+                "The host provider rejected the API key credential."
+            )
+        else:
+            raise ValueError(f"[Gemini API Error] {str(api_err)}")
 
     except Exception as ai_err:
         logger.error({
