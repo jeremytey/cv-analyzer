@@ -67,7 +67,7 @@ export function SuccessView({ payload, onReset }: SuccessViewProps) {
       {/* Bottom: rewrites */}
       <div className="border-2 border-white/20 rounded-2xl overflow-hidden">
         <div className="p-4 border-b-2 border-white/20">
-          <p className="text-xs font-mono text-white/40 tracking-tight uppercase">experience_reconstruction_stream</p>
+          <p className="text-xs font-mono text-white/40 tracking-tight uppercase">bullet_rewrites</p>
         </div>
 
         <div className="divide-y-2 divide-white/20">

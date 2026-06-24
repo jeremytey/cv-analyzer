@@ -19,12 +19,13 @@ class BulletPointRewrite(BaseModel):
             "The upgraded bullet point. Use X-Y-Z: Accomplished [X] as measured by [Y], by doing [Z]. "
             "Must contain: (1) what was built — specific, not vague, "
             "(2) the exact technical stack named inline (not in a separate section), "
-            "(3) a realistic measurable outcome — latency in ms, throughput, users, "
-            "test coverage percentage, downloads, cost reduced, hours automated. "
+            "(3) a measurable outcome — if a real metric exists in the CV, use it exactly. "
+            "If no metric exists, insert a bracketed placeholder: [X users], [Y ms], [Z% coverage], "
+            "[N downloads] — never invent a specific number. "
             "LENGTH CONSTRAINT: Maximum 25 words. Every word must earn its place. "
             "A candidate must be able to fit this on a one-page CV without reformatting. "
             "Do not use: 'spearheaded', 'robust', 'passionate', 'team player', or any filler. "
-            "The candidate must be able to defend every metric in an interview."
+            "The candidate fills in bracketed placeholders with real figures before submitting."
         )
     )
     justification: str = Field(
@@ -131,8 +132,10 @@ def generate_analysis(cv_text: str, job_description: str) -> dict:
         "Every rewritten bullet must contain:\n"
         "  (1) What was built — specific, not vague.\n"
         "  (2) The exact technical stack named inline in the bullet itself.\n"
-        "  (3) A measurable outcome — latency, throughput, users, downloads, "
-        "test coverage, pipeline time, cost.\n"
+        "  (3) A measurable outcome — if a real metric exists in the CV, use it exactly as stated. "
+        "If no metric exists, use a bracketed placeholder: [X users], [Y ms], [Z% test coverage], "
+        "[N downloads]. Never invent a specific number. "
+        "The candidate fills in placeholders with real figures before submitting their CV.\n"
         "LENGTH: Maximum 25 words per bullet. This is a hard limit. "
         "A candidate must be able to place this on a one-page CV without reformatting. "
         "Internship and fresh graduate CVs in Malaysia and Singapore are strictly one page. "
@@ -164,11 +167,15 @@ def generate_analysis(cv_text: str, job_description: str) -> dict:
         "If they do not, name the specific bullet that is worst.\n\n"
 
         "RULE 7 — WHAT GOOD LOOKS LIKE:\n"
-        "Strong bullet: 'Engineered Redis-backed async job queue in Node.js and Python, "
+        "Strong bullet (metric in CV): 'Engineered Redis-backed async job queue in Node.js and Python, "
         "reducing p95 API response time from 28s to 210ms under concurrent load.' (22 words) "
-        "Strong bullet: 'Published Minecraft plugin via TravisCI CD pipeline — "
+        "Strong bullet (no metric in CV): 'Engineered Redis-backed async job queue in Node.js and Python, "
+        "reducing p95 API response time by [X ms] under concurrent load.' "
+        "Strong bullet (metric in CV): 'Published Minecraft plugin via TravisCI CD pipeline — "
         "2K+ downloads, 4.5/5 stars across 200+ reviews.' (17 words) "
         "Weak bullet: 'Worked on backend APIs using various technologies to improve system performance.' "
+        "Every rewrite must move from weak toward strong. "
+        "Never invent numbers — use bracketed placeholders when real evidence is absent from the CV."
         "Every rewrite must move from weak toward strong."
     )
 

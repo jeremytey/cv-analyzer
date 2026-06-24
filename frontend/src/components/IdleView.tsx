@@ -14,13 +14,8 @@ export function IdleView({ file, setFile, jobDescription, setJobDescription, onS
   const inputRef = useRef<HTMLInputElement>(null)
 
   const validateAndSetFile = (f: File) => {
-    const allowed = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    ]
-    if (!allowed.includes(f.type)) {
-      setError('only pdf or word documents accepted.')
+    if (f.type !== 'application/pdf') {
+      setError('only pdf documents accepted.')
       return
     }
     if (f.size > 5 * 1024 * 1024) {
@@ -109,13 +104,13 @@ export function IdleView({ file, setFile, jobDescription, setJobDescription, onS
           </div>
 
           <div className="relative z-10 mt-6">
-            <p className="text-xs font-mono text-white/30 tracking-tight">pdf · doc · docx · max 5mb</p>
+            <p className="text-xs font-mono text-white/30 tracking-tight">pdf only · max 5mb</p>
           </div>
 
           <input
             ref={inputRef}
             type="file"
-            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            accept=".pdf,application/pdf"
             className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) validateAndSetFile(f) }}
           />

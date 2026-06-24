@@ -11,7 +11,7 @@ const router = Router();
 // -------------------------------------------------------------------------
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = process.env.NODE_ENV === 'test' 
+    const uploadDir = process.env.NODE_ENV === 'test'
       ? path.join(__dirname, '../../uploads-test')
       : '/app/uploads';
     cb(null, uploadDir);
@@ -28,16 +28,12 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024, // Strict 5MB ceiling constraint
   },
   fileFilter: (req, file, cb) => {
-  if (
-    file.mimetype === 'application/pdf' ||
-    file.mimetype === 'application/msword' ||
-    file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  ) {
-    cb(null, true);
-  } else {
-    cb(new Error('INVALID_FILE_TYPE'));
-  }
-},
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('INVALID_FILE_TYPE'));
+    }
+  },
 });
 
 // -------------------------------------------------------------------------
@@ -46,27 +42,30 @@ const upload = multer({
 
 /**
  * @route   POST /api/v1/analyze
- * @desc    Accepts multi-part resume document streams and triggers down to the execution engine
+ * @desc    Accepts PDF resume documents and triggers down to the execution engine
  */
 router.post(
   '/analyze',
   (req: Request, res: Response, next: NextFunction) => {
     upload.single('cv')(req, res, (err: any) => {
-    if (err) {
-      if (err instanceof multer.MulterError) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
-        return next(new AppError('File size exceeds the rigid 5MB restriction limit.', 400));
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return next(new AppError('File size exceeds the rigid 5MB restriction limit.', 400));
+          }
+          return next(new AppError(`File upload transmission failure: ${err.message}`, 400));
+        }
+        // Plain Error from fileFilter
+        if (err.message === 'INVALID_FILE_TYPE') {
+          return next(new AppError(
+            'Invalid file format. Only machine-readable PDF documents (.pdf) are permitted.',
+            400
+          ));
+        }
+        return next(err);
       }
-      return next(new AppError(`File upload transmission failure: ${err.message}`, 400));
-    }
-    // Plain Error from fileFilter
-    if (err.message === 'INVALID_FILE_TYPE') {
-      return next(new AppError('Invalid file type format. Only PDF and Word documents are permitted.', 400));
-    }
-    return next(err);
-  }
-  next();
-});
+      next();
+    });
   },
   triggerAnalysis
 );
