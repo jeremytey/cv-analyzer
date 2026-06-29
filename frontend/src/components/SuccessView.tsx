@@ -13,7 +13,12 @@ function scoreLabel(score: number): { text: string; color: string } {
 
 export function SuccessView({ payload, onReset }: SuccessViewProps) {
   const { matchScore, analysisResults } = payload
-  const { keyword_gaps, rewritten_bullet_points } = analysisResults
+  const { 
+    keyword_gaps, 
+    rewritten_bullet_points, 
+    stack_redundancy_warning, 
+    one_page_verdict 
+  } = analysisResults
   const label = scoreLabel(matchScore)
 
   return (
@@ -63,6 +68,24 @@ export function SuccessView({ payload, onReset }: SuccessViewProps) {
           </div>
         </div>
       </div>
+
+      {/* Strategic Insight Block 1: One-Page Architecture Audit */}
+      <div className="border-2 border-white/20 rounded-2xl p-5 mb-4 flex flex-col gap-2">
+        <p className="text-xs font-mono text-white/40 tracking-tight uppercase">layout_density_verdict</p>
+        <p className="text-xs font-mono text-white/80 tracking-tight leading-relaxed">
+          {one_page_verdict || "Document formatting demonstrates precise single-page technical layout discipline."}
+        </p>
+      </div>
+
+      {/* Strategic Insight Block 2: Tech Stack Redundancy Warning */}
+      {stack_redundancy_warning && (
+        <div className="border-2 border-amber-500/30 bg-amber-500/5 rounded-2xl p-5 mb-4 flex flex-col gap-2">
+          <p className="text-xs font-mono text-amber-400 tracking-tight uppercase">stack_redundancy_alert</p>
+          <p className="text-xs font-mono text-white/80 tracking-tight leading-relaxed">
+            {stack_redundancy_warning}
+          </p>
+        </div>
+      )}
 
       {/* Bottom: rewrites */}
       <div className="border-2 border-white/20 rounded-2xl overflow-hidden">
