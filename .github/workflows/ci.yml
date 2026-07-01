@@ -1,0 +1,91 @@
+name: Continuous Integration Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  api-test-suite:
+    name: Backend API Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: cv_analyzer_test_user
+          POSTGRES_PASSWORD: test_secure_password_123
+          POSTGRES_DB: cv_analyzer_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cv_analyzer_test_user -d cv_analyzer_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm Package Manager
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Initialize Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: api/pnpm-lock.yaml
+
+      - name: Install Project Dependencies
+        run: |
+          cd api
+          pnpm install --frozen-lockfile
+
+      - name: Apply Database Schema Migrations
+        env:
+          DATABASE_URL: postgresql://cv_analyzer_test_user:test_secure_password_123@localhost:5432/cv_analyzer_test?schema=public
+        run: |
+          cd api
+          npx prisma migrate deploy
+
+      - name: Execute Jest Integration Tests
+        env:
+          DATABASE_URL: postgresql://cv_analyzer_test_user:test_secure_password_123@localhost:5432/cv_analyzer_test?schema=public
+          REDIS_URL: redis://localhost:6379
+          NODE_ENV: test
+        run: |
+          cd api
+          pnpm test
+
+  worker-test-suite:
+    name: Python Worker Core Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Initialize Python Runtime Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Core Dependencies
+        run: |
+          cd worker
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest pdfplumber pytest-mock
+
+      - name: Execute Pytest Suite
+        env:
+          PYTHONPATH: ".:worker"
+          GEMINI_API_KEY: "ci_pipeline_stub_token_value"
+        run: |
+          pytest worker/tests/ -v

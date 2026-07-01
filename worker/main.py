@@ -4,6 +4,8 @@ import time
 import json
 import logging
 import signal
+import base64
+import re
 from datetime import datetime
 from redis import Redis
 
@@ -20,6 +22,8 @@ logger = logging.getLogger("worker.main")
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 QUEUE_NAME = os.environ.get("REDIS_QUEUE_NAME", "cv_analysis_queue")
+
+UUID_V4_REGEX = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", re.IGNORECASE)
 
 try:
     redis_client = Redis.from_url(REDIS_URL, socket_timeout=60, socket_keepalive=True)
@@ -49,15 +53,23 @@ def start_worker_loop():
             job_data = json.loads(raw_payload_str)
 
             job_id = job_data.get("jobId")
-            file_path = job_data.get("cvPath")
+            base64_pdf = job_data.get("base64Pdf")
             job_description = job_data.get("jobDescription")
 
-            if not job_id or not file_path or not job_description:
-                logger.error(f"Malformed job dropped: {job_data}")
+            if not job_id or not base64_pdf or not job_description:
+                # REDACTED: Log only structural existence markers to protect Render standard out storage capacity
+                logger.error(
+                    f"Malformed job packet dropped at transport boundary. "
+                    f"Metadata: [jobId={bool(job_id)}, base64Pdf={bool(base64_pdf)}, jobDescription={bool(job_description)}]"
+                )
                 continue
 
-            logger.info(f"📋 Job ID {job_id} acquired.")
-            process_job(job_id, file_path, job_description)
+            if not UUID_V4_REGEX.match(str(job_id)):
+                logger.error(f"Security Alert: Blocked job payload with non-UUID token formatting: {job_id}")
+                continue
+
+            logger.info(f"📋 Job ID {job_id} acquired from queue layer.")
+            process_job(job_id, base64_pdf, job_description)
 
         except json.JSONDecodeError:
             logger.error("Failed to parse queue message. Not valid JSON.")
@@ -67,13 +79,20 @@ def start_worker_loop():
 
     logger.info("👋 Worker shutdown complete.")
 
-def process_job(job_id: str, file_path: str, job_description: str):
+def process_job(job_id: str, base64_pdf: str, job_description: str):
+    temp_file_path = f"/tmp/{job_id}.pdf"
+    
     try:
         started_at = datetime.utcnow()
         start_processing_job(job_id, started_at)
         logger.info(f"⚡ Job ID {job_id} transitioned to PROCESSING state.")
 
-        cv_text = extract_text_from_pdf(file_path)
+        # FIX A: Enforce validate=True to guarantee binascii.Error trips immediately on corrupt content characters
+        pdf_bytes = base64.b64decode(base64_pdf, validate=True)
+        with open(temp_file_path, "wb") as temp_file:
+            temp_file.write(pdf_bytes)
+
+        cv_text = extract_text_from_pdf(temp_file_path)
         analysis_payload = generate_analysis(cv_text, job_description)
 
         finalize_job_analysis(job_id, {
@@ -82,17 +101,19 @@ def process_job(job_id: str, file_path: str, job_description: str):
             "analysis_results": analysis_payload["analysis_results"],
             "error_message": None
         })
-        logger.info(f"🏆 Job ID {job_id} complete.")
+        logger.info(f"🏆 Job ID {job_id} processing successfully completed.")
 
     except (FileNotFoundError, ValueError) as validation_err:
-        # Passes targeted [Tag] strings from pdf_extractor and llm_client straight to the DB
         logger.warning(f"⚠️ Validation failure on Job ID {job_id}: {str(validation_err)}")
-        finalize_job_analysis(job_id, {
-            "status": "FAILED",
-            "match_score": 0.0,
-            "analysis_results": None,
-            "error_message": str(validation_err)
-        })
+        try:
+            finalize_job_analysis(job_id, {
+                "status": "FAILED",
+                "match_score": 0.0,
+                "analysis_results": None,
+                "error_message": str(validation_err)
+            })
+        except Exception as db_err:
+            logger.error(f"Failed to record validation error state for job {job_id}: {str(db_err)}")
 
     except Exception as system_err:
         logger.error(f"💥 System failure on Job ID {job_id}: {str(system_err)}", exc_info=True)
@@ -105,6 +126,14 @@ def process_job(job_id: str, file_path: str, job_description: str):
             })
         except Exception as db_fatal_err:
             logger.critical(f"Cannot write failure state for Job {job_id}: {str(db_fatal_err)}")
+            
+    finally:
+        if os.path.exists(temp_file_path):
+            try:
+                os.remove(temp_file_path)
+                logger.info(f"Cleaned up temporary file reference: {temp_file_path}")
+            except Exception as cleanup_err:
+                logger.error(f"Leak Warning: Failed to evict {temp_file_path} from scratch storage: {str(cleanup_err)}")
 
 if __name__ == "__main__":
     start_worker_loop()
