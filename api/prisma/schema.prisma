@@ -7,7 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 4 status for analysis jobs of CV
 enum Status {
   PENDING
   PROCESSING
@@ -18,7 +17,6 @@ enum Status {
 model Analysis {
   jobId            String    @id @map("job_id") @default(uuid())
   originalFilename String    @map("original_filename")
-  cvPath           String    @map("cv_path")
   jobDescription   String    @map("job_description")
   status           Status    @default(PENDING)
   matchScore       Decimal?  @map("match_score") @db.Decimal(5, 2)
@@ -28,7 +26,7 @@ model Analysis {
   completedAt      DateTime? @map("completed_at")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
-  retryCount Int @default(0) @map("retry_count")
+  retryCount       Int       @default(0) @map("retry_count")
 
   @@map("analyses")
 }

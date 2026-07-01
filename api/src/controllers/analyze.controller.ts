@@ -1,29 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
-import 'multer'; // Guarantees global Express namespace definition merging under Node16 resolution
+import 'multer';
 import { AppError } from '../lib/app-error';
 import { logger } from '../lib/logger';
 import { initiateAnalysis, getAnalysisState } from '../services/analyze.service';
 
-type AuthenticatedUploadRequest = Request & { file: Express.Multer.File };
+type AuthenticatedMemoryRequest = Request & { file: Express.Multer.File };
 
-/**
- * @route   POST /api/v1/analyze
- * @desc    Validates multi-part request boundaries and delegates orchestration to the domain service layer
- * @access  Public
- */
-export const triggerAnalysis = async (
-  req: Request, 
-  res: Response, 
-  next: NextFunction
-): Promise<void> => {
+export const triggerAnalysis = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    if (!req.file) {
-      next(new AppError('No CV file provided. Please upload a valid document.', 400));
-      return;
-    }
-
-    const multerReq = req as AuthenticatedUploadRequest;
-    const { originalname: originalFilename, path: cvPath } = multerReq.file;
+    const multerReq = req as AuthenticatedMemoryRequest;
+    const { originalname: originalFilename, buffer } = multerReq.file;
 
     const { jobDescription } = req.body;
     if (!jobDescription || typeof jobDescription !== 'string' || jobDescription.trim().length === 0) {
@@ -31,15 +17,16 @@ export const triggerAnalysis = async (
       return;
     }
 
-    // Single source of truth handles DB transaction + Redis queue emission + compensating rollbacks
+    const base64Pdf = buffer.toString('base64');
+
     const analysisJob = await initiateAnalysis({
       originalFilename,
-      cvPath,
+      base64Pdf,
       jobDescription: jobDescription.trim()
     });
 
     logger.info({
-      message: 'Analysis job processing pipeline initialized successfully',
+      message: 'Analysis job processing pipeline initialized successfully via in-memory transport',
       jobId: analysisJob.jobId,
       filename: originalFilename,
     });
@@ -61,20 +48,9 @@ export const triggerAnalysis = async (
   }
 };
 
-/**
- * @route   GET /api/v1/analyze/:jobId
- * @desc    Fetches the current processing state and evaluation results of a specific CV job
- * @access  Public
- */
-export const getAnalysisStatus = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
+export const getAnalysisStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { jobId } = req.params;
-
-    // Service layer handles resource querying and safely throws an explicit 404 AppError internally if missing
     const analysisJob = await getAnalysisState(jobId);
 
     res.status(200).json({
