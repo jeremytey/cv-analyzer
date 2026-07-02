@@ -1,104 +1,83 @@
-import json
 import os
 import logging
-from datetime import datetime
-from psycopg2 import pool  # type: ignore
+import threading
+from psycopg_pool import ConnectionPool
 
 logger = logging.getLogger("worker.db_client")
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("CRITICAL: DATABASE_URL environment variable is missing from the environment configuration.")
+# Threading primitives to ensure safe instantiation in concurrent environments
+_pool_lock = threading.Lock()
+_db_pool = None
 
-try:
-    db_pool = pool.ThreadedConnectionPool(1, 5, dsn=DATABASE_URL)
-    logger.info("✅ PostgreSQL Threaded Connection Pool successfully initialized.")
-except Exception as init_err:
-    logger.critical(f"Failed to initialize PostgreSQL connection pool: {str(init_err)}")
-    raise
+def get_pool() -> ConnectionPool:
+    """
+    Thread-safe lazy initializer for the PostgreSQL connection pool.
+    Defers environment parsing and socket binding past import collection time.
+    """
+    global _db_pool
+    
+    # Fast path: pool is already wired and healthy
+    if _db_pool is not None:
+        return _db_pool
+        
+    with _pool_lock:
+        # Double-checked locking pattern to prevent race conditions
+        if _db_pool is None:
+            database_url = os.environ.get("DATABASE_URL")
+            if not database_url:
+                logger.critical("CRITICAL ENVIRONMENT ERROR: 'DATABASE_URL' variable is missing from runtime context.")
+                raise ValueError("DATABASE_URL environment variable must be populated before invoking the database layer.")
+            
+            try:
+                logger.info("Initializing connection pool pool layer (Deferred Connection Mode)...")
+                _db_pool = ConnectionPool(
+                    conninfo=database_url,
+                    min_size=2,
+                    max_size=10,
+                    open=True
+                )
+                logger.info("✅ PostgreSQL Connection Pool instantiated cleanly.")
+            except Exception as pool_err:
+                logger.critical(f"Failed to instantiate connection pool footprint: {str(pool_err)}")
+                raise
+                
+    return _db_pool
 
-def start_processing_job(job_id: str, started_at: datetime) -> bool:
-    """
-    Transitions the resume status to PROCESSING and timestamps exactly when the worker 
-    popped the job off the Redis queue. Leaves completed_at untouched.
-    """
+def start_processing_job(job_id: str, started_at):
+    """Transitions a tracking job state marker to PROCESSING."""
+    pool = get_pool()
     query = """
         UPDATE analyses
-        SET 
-            status = 'PROCESSING',
-            started_at = %s,
-            updated_at = %s
+        SET status = 'PROCESSING', started_at = %s, updated_at = NOW()
         WHERE job_id = %s;
     """
-    
-    conn = None
-    cursor = None
-    try:
-        conn = db_pool.getconn()
-        cursor = conn.cursor()
-        
-        cursor.execute(query, (started_at, started_at, job_id))
-        conn.commit()
-        return cursor.rowcount > 0
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (started_at, job_id))
 
-    except Exception as db_err:
-        if conn:
-            conn.rollback()
-        logger.error({"message": f"Failed to transition Job {job_id} to PROCESSING", "job_id": job_id, "error": str(db_err)})
-        raise db_err
-    finally:
-        if cursor: 
-            cursor.close()
-        if conn: 
-            db_pool.putconn(conn)
-
-def finalize_job_analysis(job_id: str, payload: dict) -> bool:
-    """
-    Saves final analysis structures or error states, updates completed_at, 
-    and drains the connection back to the pool. Leaves started_at untouched.
-    """
-    completed_at = datetime.utcnow()
-    
-    status = payload.get("status", "FAILED")
-    match_score = payload.get("match_score")
-    analysis_results = payload.get("analysis_results")
-    error_message = payload.get("error_message")
-
-    serialized_results = json.dumps(analysis_results) if analysis_results is not None else None
-
+def finalize_job_analysis(job_id: str, payload: dict):
+    """Commits the finalized LLM assessment output metrics back to the tracking row."""
+    pool = get_pool()
     query = """
         UPDATE analyses
-        SET 
-            status = %s,
-            match_score = %s,
-            analysis_results = %s,
-            error_message = %s,
-            completed_at = %s,
-            updated_at = %s
+        SET status = %s, 
+            match_score = %s, 
+            analysis_results = %s, 
+            error_message = %s, 
+            completed_at = NOW(), 
+            updated_at = NOW()
         WHERE job_id = %s;
     """
-
-    conn = None
-    cursor = None
-    try:
-        conn = db_pool.getconn()
-        cursor = conn.cursor()
-        
-        cursor.execute(
-            query, 
-            (status, match_score, serialized_results, error_message, completed_at, completed_at, job_id)
-        )
-        
-        conn.commit()
-        return cursor.rowcount > 0
-
-    except Exception as db_err:
-        if conn:
-            conn.rollback()
-        logger.error({"message": f"Database finalization execution failed for Job {job_id}", "job_id": job_id, "error": str(db_err)})
-        raise db_err
-    finally:
-        if cursor: 
-            cursor.close()
-        if conn: 
-            db_pool.putconn(conn)
+    # Import json cleanly to serialize dictionaries into the native Postgres JSONB column format
+    import json
+    results_json = json.dumps(payload["analysis_results"]) if payload["analysis_results"] else None
+    
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (
+                payload["status"],
+                payload["match_score"],
+                results_json,
+                payload["error_message"],
+                job_id
+            ))
