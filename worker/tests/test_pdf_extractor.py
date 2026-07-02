@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 # Update this import path to match your exact directory tree location
-from modules.pdf_extractor import extract_text_from_pdf
+from worker.modules.pdf_extractor import extract_text_from_pdf
 
 def test_extract_text_missing_file_throws_file_not_found():
     non_existent_path = "/app/uploads/non_existent_file.pdf"
@@ -12,8 +12,8 @@ def test_extract_text_missing_file_throws_file_not_found():
     assert "CV parsing boundary failed" in str(exc_info.value)
 
 
-@patch("modules.pdf_extractor.os.path.exists")
-@patch("modules.pdf_extractor.os.path.isfile")
+@patch("worker.modules.pdf_extractor.os.path.exists")
+@patch("worker.modules.pdf_extractor.os.path.isfile")
 def test_extract_text_directory_path_throws_value_error(mock_isfile, mock_exists, tmp_path):
     # Setup paths
     directory_path = str(tmp_path / "mock_directory")
@@ -28,9 +28,9 @@ def test_extract_text_directory_path_throws_value_error(mock_isfile, mock_exists
     assert "Target path does not resolve to a file entity" in str(exc_info.value)
 
 
-@patch("modules.pdf_extractor.os.path.exists")
-@patch("modules.pdf_extractor.os.path.isfile")
-@patch("modules.pdf_extractor.os.path.getsize")
+@patch("worker.modules.pdf_extractor.os.path.exists")
+@patch("worker.modules.pdf_extractor.os.path.isfile")
+@patch("worker.modules.pdf_extractor.os.path.getsize")
 def test_extract_text_oversized_file_throws_value_error(mock_getsize, mock_isfile, mock_exists):
     dummy_path = "/app/uploads/bloated_cv.pdf"
     mock_exists.return_value = True
@@ -44,10 +44,10 @@ def test_extract_text_oversized_file_throws_value_error(mock_getsize, mock_isfil
     assert "File size limit exceeded" in str(exc_info.value)
 
 
-@patch("modules.pdf_extractor.os.path.exists")
-@patch("modules.pdf_extractor.os.path.isfile")
-@patch("modules.pdf_extractor.os.path.getsize")
-@patch("modules.pdf_extractor.pdfplumber.open")
+@patch("worker.modules.pdf_extractor.os.path.exists")
+@patch("worker.modules.pdf_extractor.os.path.isfile")
+@patch("worker.modules.pdf_extractor.os.path.getsize")
+@patch("worker.modules.pdf_extractor.pdfplumber.open")
 def test_extract_text_empty_or_scanned_pdf_throws_value_error(
     mock_pdf_open, mock_getsize, mock_isfile, mock_exists
 ):
@@ -67,4 +67,4 @@ def test_extract_text_empty_or_scanned_pdf_throws_value_error(
     with pytest.raises(ValueError) as exc_info:
         extract_text_from_pdf(dummy_path)
         
-    assert "Failed to extract any machine-readable characters" in str(exc_info.value)
+    assert "No parseable text detected" in str(exc_info.value)

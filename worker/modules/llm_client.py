@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import threading
 from typing import List
 from pydantic import BaseModel, Field
 from google import genai
@@ -8,6 +9,36 @@ from google.genai import types
 from google.genai.errors import APIError
 
 logger = logging.getLogger("worker.llm_client")
+
+# Threading primitives to ensure safe instantiation in concurrent environments
+_client_lock = threading.Lock()
+_client_instance = None
+
+def get_llm_client() -> genai.Client:
+    """
+    Thread-safe lazy initializer for the Gemini SDK Client.
+    Defers environment parsing and SDK configuration past import collection time.
+    """
+    global _client_instance
+
+    if _client_instance is not None:
+        return _client_instance
+
+    with _client_lock:
+        if _client_instance is None:
+            if not os.environ.get("GEMINI_API_KEY"):
+                logger.critical("CRITICAL ENVIRONMENT ERROR: 'GEMINI_API_KEY' variable is missing from runtime context.")
+                raise ValueError("GEMINI_API_KEY environment variable must be populated before invoking the LLM layer.")
+
+            try:
+                logger.info("Initializing Gemini SDK Client (Deferred Connection Mode)...")
+                _client_instance = genai.Client()
+                logger.info("✅ Gemini SDK Client successfully initialized.")
+            except Exception as init_err:
+                logger.critical(f"Failed to initialize Gemini SDK client wrapper: {str(init_err)}")
+                raise
+
+    return _client_instance
 
 
 class BulletPointRewrite(BaseModel):
@@ -91,14 +122,6 @@ class MasterOutputSchema(BaseModel):
     detailed_analysis: AnalysisStructure
 
 
-try:
-    client = genai.Client()
-    logger.info("✅ Gemini SDK Client successfully initialized at module level.")
-except Exception as init_err:
-    logger.critical(f"Failed to initialize Gemini SDK client wrapper: {str(init_err)}")
-    raise
-
-
 def generate_analysis(cv_text: str, job_description: str) -> dict:
     """
     Dispatches CV text and job description to Gemini 2.5 Flash.
@@ -107,6 +130,9 @@ def generate_analysis(cv_text: str, job_description: str) -> dict:
     """
     if not cv_text.strip() or not job_description.strip():
         raise ValueError("LLM execution boundary failed. Context payloads cannot be empty strings.")
+
+    # Retrieve our lazy client connection mapping
+    client = get_llm_client()
 
     system_instruction = (
         "You are a Principal Engineer and Technical Recruiting Lead at a Tier-1 Southeast Asian "
