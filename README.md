@@ -18,47 +18,15 @@ This tool runs a gap analysis between a CV and a specific job description,
 returns a match score, identifies missing keywords, and generates rewritten 
 bullet points that close those gaps — copy-paste ready.
 
----
-
-## Problem Validation
-
-Five CS students at Malaysian universities were interviewed about their actual 
-job application behaviour. Key findings:
-
-- **5/5** reported ghosting and zero feedback as their primary frustration
-- **4/5** tailor CVs manually by gut feel with no structured system
-- **3/5** explicitly mentioned not knowing whether their CV is ATS-friendly
-- **2/5** identified Canva editing friction as a secondary execution pain point
-
-Selected responses:
-
-> "The most frustrating part is spending a lot of time applying for jobs but 
-> getting little or no response. It can also be difficult to know whether my 
-> CV is good enough or ATS-friendly for the role." — Anonymous, CS student
-
-> "I don't send the exact same CV every time. I keep one master CV and spend 
-> 5–10 mins customizing it per application — reordering bullet points, adding 
-> keywords from the job description. The uncertainty and time wasted is the 
-> worst." — Anonymous, CS student
-
-> "My CV is built on Canva, and every time editing certain details requires me 
-> to adjust the overall design, move the text and images, which is a bit 
-> frustrating." — Anonymous, CS student
-
-> "Many places have 'Drop your Resume' QR codes. In my case, 99% of the time 
-> I will not get any response from the team." — Anonymous, CS student
-
-> "I tailor my CV depending on the company — mostly changing the skills part 
-> and experience to reflect the relevant skills the company needs." 
-> — Dex, CS student
-
-Zero of the five students had a systematic way to verify whether their CV 
-contained the keywords a specific job description required. This tool is built 
-to close that gap.
+Real problem validation (5 CS students interviewed on their actual application 
+behaviour, not hypothetical survey answers) is documented in [RESEARCH.md](./RESEARCH.md).
 
 ---
 
 ## Architecture
+
+> **If you're reviewing this before an interview:** read the two subsections 
+> below the table first. They're the strongest engineering signal in this repo.
 
 Four services orchestrated with Docker Compose:
 
@@ -70,8 +38,8 @@ Four services orchestrated with Docker Compose:
 | db | postgres:16 | Shared persistent store for job state and results |
 
 The LLM system instruction enforces binary keyword evaluation, X-Y-Z bullet 
-formatting, stack diversity auditing, and a 25-word conciseness constraint. 
-Calibrated against Malaysian tech recruiter screening standards.
+formatting, and a 25-word conciseness constraint. Calibrated against Malaysian 
+tech recruiter screening standards.
 
 ### Why async via Redis instead of synchronous LLM calls
 
@@ -123,7 +91,7 @@ post-MVP.
 ## Tech Stack
 
 **API:** Node.js 20, Express, TypeScript, Prisma, Zod, Multer, ioredis, Winston  
-**Worker:** Python 3.11, redis-py, pdfplumber, google-genai, psycopg2, Pydantic  
+**Worker:** Python 3.11, redis-py, pdfplumber, google-genai, psycopg3, Pydantic  
 **Infrastructure:** PostgreSQL 16, Redis 7, Docker Compose  
 
 ---
@@ -131,7 +99,8 @@ post-MVP.
 ## Getting Started
 
 ### Prerequisites
-- Docker and Docker Compose
+- Docker and Docker Compose (provisions PostgreSQL and Redis automatically — 
+  no separate local database setup required)
 - Google AI API key (Gemini 2.5 Flash)
 
 ### Setup
@@ -144,7 +113,7 @@ cd cv-analyzer
 Create `.env` in the root:
 
 ```env
-GOOGLE_API_KEY=your_key_here
+GEMINI_API_KEY=your_key_here
 ```
 
 Start all services:
@@ -175,17 +144,15 @@ Frontend available at `http://localhost:5173`
 cd api && npm test
 
 # Worker unit tests (Python)
-cd worker && pytest
+python -m pytest worker/tests/ -v
 ```
 
-8 Node integration tests · 4 Python unit tests
+8 Node integration tests (1 skipped) · 7 Python unit tests
 
 ---
 
 ## Project Structure
 
-## Project Structure
-```
 cv-analyzer/
 ├── docker-compose.yml       # Orchestrates local development (DB, Queue, App containers)
 ├── .dockerignore            # Excludes global node_modules and virtual environments
@@ -205,17 +172,11 @@ cv-analyzer/
 │   ├── public/              # Static public assets
 │
 └── worker/                  # Python Consumer Worker (Heavy Processing)
-    ├── main.py              # Worker entry point & message queue listener
-    └── modules/
-        ├── pdf_extractor.py # Text parsing and preprocessing from uploaded CVs
-        ├── llm_client.py    # Structured parsing & prompt execution via LLM API
-        └── db_client.py     # Direct data persistence for processing results
-```
----
-
-## User Feedback Log
-
-_To be added after real user testing._
+├── main.py              # Worker entry point & message queue listener
+└── modules/
+├── pdf_extractor.py # Text parsing and preprocessing from uploaded CVs
+├── llm_client.py    # Structured parsing & prompt execution via LLM API
+└── db_client.py     # Direct data persistence for processing results
 
 ---
 
