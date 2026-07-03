@@ -152,7 +152,7 @@ python -m pytest worker/tests/ -v
 ---
 
 ## Project Structure
-
+```
 cv-analyzer/
 ├── docker-compose.yml       # Orchestrates local development (DB, Queue, App containers)
 ├── .dockerignore            # Excludes global node_modules and virtual environments
@@ -177,7 +177,7 @@ cv-analyzer/
 ├── pdf_extractor.py # Text parsing and preprocessing from uploaded CVs
 ├── llm_client.py    # Structured parsing & prompt execution via LLM API
 └── db_client.py     # Direct data persistence for processing results
-
+```
 ---
 
 ## License
