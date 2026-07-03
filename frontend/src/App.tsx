@@ -15,7 +15,6 @@ export interface BulletRewrite {
 export interface AnalysisResult {
   keyword_gaps: string[]
   rewritten_bullet_points: BulletRewrite[]
-  stack_redundancy_warning: string
   one_page_verdict: string
 }
 
@@ -35,7 +34,6 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [consecutiveRetries, setConsecutiveRetries] = useState<number>(0)
 
-  // Lifted form context — survives IDLE → PROCESSING → ERROR → IDLE transitions
   const [file, setFile] = useState<File | null>(null)
   const [jobDescription, setJobDescription] = useState<string>('')
 
@@ -58,7 +56,7 @@ export default function App() {
 
         if (!res.ok) {
           stopPolling()
-          setConsecutiveRetries((prev) => prev + 1) // Failure count handled at error transition boundaries
+          setConsecutiveRetries((prev) => prev + 1)
           setErrorMessage(json.message ?? 'Polling request failed.')
           setUiState('ERROR')
           return
@@ -73,18 +71,17 @@ export default function App() {
             matchScore: Number(json.data.matchScore),
             analysisResults: json.data.analysisResults as AnalysisResult,
           })
-          setConsecutiveRetries(0) // Wipe out historical attempts on full pipeline resolution
+          setConsecutiveRetries(0)
           setUiState('SUCCESS')
         } else if (status === 'FAILED') {
           stopPolling()
-          setConsecutiveRetries((prev) => prev + 1) // Failure count handled at error transition boundaries
+          setConsecutiveRetries((prev) => prev + 1)
           setErrorMessage(json.data.errorMessage ?? 'Analysis failed.')
           setUiState('ERROR')
         }
-        // PENDING and PROCESSING: keep polling
       } catch {
         stopPolling()
-        setConsecutiveRetries((prev) => prev + 1) // Failure count handled at error transition boundaries
+        setConsecutiveRetries((prev) => prev + 1)
         setErrorMessage('Network error. Could not reach the server.')
         setUiState('ERROR')
       }
@@ -97,7 +94,7 @@ export default function App() {
     setUiState('PROCESSING')
     setErrorMessage(null)
     setSuccessPayload(null)
-    setConsecutiveRetries(0) // Fresh submission from IDLE completely zeroes out the retry state machine
+    setConsecutiveRetries(0)
 
     const formData = new FormData()
     formData.append('cv', selectedFile)
@@ -111,7 +108,7 @@ export default function App() {
       const json = await res.json()
 
       if (!res.ok) {
-        setConsecutiveRetries((prev) => prev + 1) // Initial failure transition increments count to 1
+        setConsecutiveRetries((prev) => prev + 1)
         setErrorMessage(json.message ?? 'Failed to submit analysis.')
         setUiState('ERROR')
         return
@@ -119,13 +116,12 @@ export default function App() {
 
       setJobId(json.data.jobId)
     } catch {
-      setConsecutiveRetries((prev) => prev + 1) // Initial network failure transition increments count to 1
+      setConsecutiveRetries((prev) => prev + 1)
       setErrorMessage('Network error. Could not reach the server.')
       setUiState('ERROR')
     }
   }
 
-  // Soft fallback back to IDLE view without destroying user text/file context 
   const handleReset = () => {
     stopPolling()
     setJobId(null)
@@ -134,7 +130,6 @@ export default function App() {
     setUiState('IDLE')
   }
 
-  // Clean wipe used exclusively when clicking "Start Over" on SuccessView
   const handleFullClear = () => {
     stopPolling()
     setJobId(null)

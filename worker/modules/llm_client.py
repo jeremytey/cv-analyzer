@@ -90,16 +90,6 @@ class AnalysisStructure(BaseModel):
             "Stack must be named inline in the bullet, not referenced separately."
         )
     )
-    stack_redundancy_warning: str = Field(
-        default="",
-        description=(
-            "If the candidate has used the same core stack across multiple projects "
-            "(e.g., two Node.js + MongoDB REST APIs), write one sentence flagging this. "
-            "State that recruiters at Grab and Sea Group read identical stacks as one skill built twice. "
-            "Name one concrete architectural addition that would demonstrate depth for this role. "
-            "If no redundancy exists, return an empty string."
-        )
-    )
     one_page_verdict: str = Field(
         description=(
             "One sentence assessing whether the CV's bullet points are concise enough for a one-page format. "
@@ -146,14 +136,7 @@ def generate_analysis(cv_text: str, job_description: str) -> dict:
         "If Docker is not mentioned anywhere, it is a gap. "
         "Only flag gaps for skills the job description explicitly requires.\n\n"
 
-        "RULE 2 — STACK DIVERSITY AUDIT:\n"
-        "If the candidate has built multiple projects using the same core stack, "
-        "flag this in stack_redundancy_warning. "
-        "Recruiters at Grab and Sea Group read identical stacks as one skill built twice, not two projects. "
-        "Name one concrete architectural addition for this specific role: "
-        "async queues, distributed caching, containerisation, CI/CD, or polyglot service boundaries.\n\n"
-
-        "RULE 3 — BULLET REWRITING STANDARD:\n"
+        "RULE 2 — BULLET REWRITING STANDARD:\n"
         "Format: Accomplished [X] as measured by [Y], by doing [Z]. "
         "Every rewritten bullet must contain:\n"
         "  (1) What was built — specific, not vague.\n"
@@ -170,7 +153,7 @@ def generate_analysis(cv_text: str, job_description: str) -> dict:
         "Valid verbs: built, engineered, reduced, automated, migrated, optimised, "
         "deployed, instrumented, published, shipped, architected, integrated.\n\n"
 
-        "RULE 4 — HONESTY OVER INFLATION:\n"
+        "RULE 3 — HONESTY OVER INFLATION:\n"
         "Do not fabricate experience. Do not use filler: "
         "'spearheaded robust solutions', 'team player', 'passionate about technology'. "
         "Do not treat calling a third-party API as an engineering skill — "
@@ -178,21 +161,21 @@ def generate_analysis(cv_text: str, job_description: str) -> dict:
         "If a metric is implausible or unverifiable, remove it and reframe around process quality. "
         "The candidate must be able to defend every line in a technical interview.\n\n"
 
-        "RULE 5 — SEA MARKET SIGNALS:\n"
+        "RULE 4 — SEA MARKET SIGNALS:\n"
         "Grab, Sea Group, GoTo, and ByteDance SG screen specifically for: "
         "type safety (TypeScript, typed Python), testing discipline (unit + integration coverage), "
         "CI/CD awareness, system design signals (async patterns, distributed components, caching), "
         "and scalability thinking. "
         "Weight these signals heavily in gap identification and bullet rewrites.\n\n"
 
-        "RULE 6 — ONE-PAGE DISCIPLINE:\n"
+        "RULE 5 — ONE-PAGE DISCIPLINE:\n"
         "The gold standard for internship CVs is one page. "
         "Jake Ryan's resume format is the target: each bullet under 25 words, "
         "stack named inline, metric present, action verb first. "
         "Assess whether the candidate's existing bullets meet this standard in one_page_verdict. "
         "If they do not, name the specific bullet that is worst.\n\n"
 
-        "RULE 7 — WHAT GOOD LOOKS LIKE:\n"
+        "RULE 6 — WHAT GOOD LOOKS LIKE:\n"
         "Strong bullet (metric in CV): 'Engineered Redis-backed async job queue in Node.js and Python, "
         "reducing p95 API response time from 28s to 210ms under concurrent load.' (22 words) "
         "Strong bullet (no metric in CV): 'Engineered Redis-backed async job queue in Node.js and Python, "
@@ -202,7 +185,6 @@ def generate_analysis(cv_text: str, job_description: str) -> dict:
         "Weak bullet: 'Worked on backend APIs using various technologies to improve system performance.' "
         "Every rewrite must move from weak toward strong. "
         "Never invent numbers — use bracketed placeholders when real evidence is absent from the CV."
-        "Every rewrite must move from weak toward strong."
     )
 
     prompt = f"""
@@ -210,10 +192,9 @@ Audit the candidate CV below against the job description.
 
 Your tasks:
 1. Identify every hard technical keyword the job requires that the CV does not demonstrate.
-2. Check for stack redundancy across projects. Populate stack_redundancy_warning if found.
-3. Rewrite the candidate's weakest bullet points using X-Y-Z, inline stack, measurable outcome, max 25 words.
-4. Assess one-page discipline in one_page_verdict.
-5. Do not fabricate experience. Elevate what exists with precision, honesty, and conciseness.
+2. Rewrite the candidate's weakest bullet points using X-Y-Z, inline stack, measurable outcome, max 25 words.
+3. Assess one-page discipline in one_page_verdict.
+4. Do not fabricate experience. Elevate what exists with precision, honesty, and conciseness.
 
 ---
 TARGET JOB DESCRIPTION:
