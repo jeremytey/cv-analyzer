@@ -1,7 +1,7 @@
 # CV Analyzer
 
 A polyglot distributed system that helps Malaysian CS students 
-identify ATS keyword gaps between their CV and a job description, with 
+identify ATS keyword gaps between their CV and a job posting, with 
 copy-paste ready bullet point rewrites.
 
 **Live URL:** _to be added on deployment_
@@ -16,10 +16,10 @@ actually scan for. When rejected, they have no way to diagnose why.
 
 This tool runs a gap analysis between a CV and a specific job description, 
 returns a match score, identifies missing keywords, and generates rewritten 
-bullet points that close those gaps — copy-paste ready.
+bullet points that close those gaps copy-paste ready.
 
 Real problem validation (5 CS students interviewed on their actual application 
-behaviour, not hypothetical survey answers) is documented in [RESEARCH.md](./RESEARCH.md).
+behaviour, not hypothetical survey answers) documented in [RESEARCH.md](./RESEARCH.md).
 
 ---
 
