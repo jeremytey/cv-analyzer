@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { SuccessPayload } from '../App'
 
 interface SuccessViewProps {
@@ -13,13 +14,24 @@ function scoreLabel(score: number): { text: string; color: string } {
 
 export function SuccessView({ payload, onReset }: SuccessViewProps) {
   const { matchScore, analysisResults } = payload
-  const { 
-    keyword_gaps, 
-    rewritten_bullet_points, 
-    stack_redundancy_warning, 
-    one_page_verdict 
+  const {
+    keyword_gaps,
+    rewritten_bullet_points,
+    one_page_verdict
   } = analysisResults
   const label = scoreLabel(matchScore)
+
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+
+  const handleCopy = async (text: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedIndex(index)
+      setTimeout(() => setCopiedIndex(null), 2000)
+    } catch {
+      // Clipboard write failed silently — no destructive fallback needed here
+    }
+  }
 
   return (
     <div className="flex flex-col gap-0">
@@ -28,14 +40,14 @@ export function SuccessView({ payload, onReset }: SuccessViewProps) {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs font-mono text-white/50 tracking-tight">analysis_completed</span>
+          <span className="text-xs font-mono text-white/50 tracking-tight">Analysis complete</span>
         </div>
         <button
           onClick={onReset}
           className="text-xs font-mono text-white/30 border border-white/10 px-3 py-1 rounded-full
                      hover:text-white/60 hover:border-white/30 transition-colors tracking-tight"
         >
-          reset_workspace ↺
+          Start over ↺
         </button>
       </div>
 
@@ -44,7 +56,7 @@ export function SuccessView({ payload, onReset }: SuccessViewProps) {
 
         {/* Left: match score */}
         <div className="p-6 border-r-2 border-white/20 flex flex-col justify-between">
-          <p className="text-xs font-mono text-white/40 tracking-tight uppercase mb-2">match_index</p>
+          <p className="text-xs font-mono text-white/40 tracking-tight uppercase mb-2">ATS Match Score</p>
           <div>
             <p className="text-6xl font-bold text-white leading-none font-sans">
               {matchScore}<span className="text-3xl">%</span>
@@ -57,7 +69,7 @@ export function SuccessView({ payload, onReset }: SuccessViewProps) {
 
         {/* Right: keyword gaps */}
         <div className="col-span-2 p-6">
-          <p className="text-xs font-mono text-white/40 tracking-tight uppercase mb-4">keyword_omission_matrix</p>
+          <p className="text-xs font-mono text-white/40 tracking-tight uppercase mb-4">Missing Keywords</p>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
             {keyword_gaps.map((gap) => (
               <div key={gap} className="flex items-start gap-2">
@@ -69,37 +81,27 @@ export function SuccessView({ payload, onReset }: SuccessViewProps) {
         </div>
       </div>
 
-      {/* Strategic Insight Block 1: One-Page Architecture Audit */}
+      {/* CV length feedback */}
       <div className="border-2 border-white/20 rounded-2xl p-5 mb-4 flex flex-col gap-2">
-        <p className="text-xs font-mono text-white/40 tracking-tight uppercase">layout_density_verdict</p>
+        <p className="text-xs font-mono text-white/40 tracking-tight uppercase">CV Length Feedback</p>
         <p className="text-xs font-mono text-white/80 tracking-tight leading-relaxed">
           {one_page_verdict || "Document formatting demonstrates precise single-page technical layout discipline."}
         </p>
       </div>
 
-      {/* Strategic Insight Block 2: Tech Stack Redundancy Warning */}
-      {stack_redundancy_warning && (
-        <div className="border-2 border-amber-500/30 bg-amber-500/5 rounded-2xl p-5 mb-4 flex flex-col gap-2">
-          <p className="text-xs font-mono text-amber-400 tracking-tight uppercase">stack_redundancy_alert</p>
-          <p className="text-xs font-mono text-white/80 tracking-tight leading-relaxed">
-            {stack_redundancy_warning}
-          </p>
-        </div>
-      )}
-
       {/* Bottom: rewrites */}
       <div className="border-2 border-white/20 rounded-2xl overflow-hidden">
         <div className="p-4 border-b-2 border-white/20">
-          <p className="text-xs font-mono text-white/40 tracking-tight uppercase">bullet_rewrites</p>
+          <p className="text-xs font-mono text-white/40 tracking-tight uppercase">Suggested Rewrites</p>
         </div>
 
         <div className="divide-y-2 divide-white/20">
           {rewritten_bullet_points.map((bullet, i) => (
             <div key={i} className="grid grid-cols-2 divide-x-2 divide-white/20">
 
-              {/* Left: original (deprecated) */}
+              {/* Left: original */}
               <div className="p-5">
-                <p className="text-xs font-mono text-white/30 tracking-tight uppercase mb-3">deprecated_input</p>
+                <p className="text-xs font-mono text-white/30 tracking-tight uppercase mb-3">Your original</p>
                 <p className="text-xs font-mono text-white/30 tracking-tight leading-relaxed line-through">
                   {bullet.original}
                 </p>
@@ -107,9 +109,18 @@ export function SuccessView({ payload, onReset }: SuccessViewProps) {
 
               {/* Right: rewritten */}
               <div className="p-5 flex flex-col gap-3">
-                <p className="text-xs font-mono tracking-tight uppercase mb-1" style={{ color: '#4ade80' }}>
-                  optimized_output
-                </p>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-mono tracking-tight uppercase" style={{ color: '#4ade80' }}>
+                    Suggested rewrite
+                  </p>
+                  <button
+                    onClick={() => handleCopy(bullet.rewritten, i)}
+                    className="text-xs font-mono text-white/40 border border-white/15 px-2.5 py-1 rounded-full
+                               hover:text-white/80 hover:border-white/40 transition-colors tracking-tight flex-shrink-0"
+                  >
+                    {copiedIndex === i ? 'Copied ✓' : 'Copy'}
+                  </button>
+                </div>
                 <p className="text-sm font-sans font-medium text-white/90 leading-relaxed">
                   {bullet.rewritten}
                 </p>
