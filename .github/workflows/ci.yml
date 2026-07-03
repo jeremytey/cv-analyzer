@@ -47,6 +47,11 @@ jobs:
           cd api
           pnpm install --frozen-lockfile
 
+      - name: Generate Prisma Client
+        run: |
+          cd api
+          npx prisma generate
+
       - name: Apply Database Schema Migrations
         env:
           DATABASE_URL: postgresql://cv_analyzer_test_user:test_secure_password_123@localhost:5432/cv_analyzer_test?schema=public
