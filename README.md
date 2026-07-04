@@ -4,7 +4,7 @@ A polyglot distributed system that helps Malaysian CS students
 identify ATS keyword gaps between their CV and a job description, with 
 copy-paste ready bullet point rewrites.
 
-**Live URL:** _to be added on deployment_
+**Live URL:** https://cv-analyzer-eight-tau.vercel.app/
 
 ---
 
@@ -28,14 +28,21 @@ behaviour, not hypothetical survey answers) is documented in [RESEARCH.md](./RES
 > **If you're reviewing this before an interview:** read the two subsections 
 > below the table first. They're the strongest engineering signal in this repo.
 
-Four services orchestrated with Docker Compose:
+Four services, split across separate managed platforms in production:
 
-| Service | Tech | Role |
-|---------|------|------|
-| api | Node.js 20 + Express + TypeScript | HTTP entry, Zod validation, file upload, produces Redis jobs |
-| worker | Python 3.11 | BRPOP consumer loop, PDF extraction, LLM call, writes results to PostgreSQL |
-| redis | redis:7-alpine | Async job queue between api and worker |
-| db | postgres:16 | Shared persistent store for job state and results |
+| Service | Tech | Role | Hosted on |
+|---------|------|------|-----------|
+| api | Node.js 20 + Express + TypeScript | HTTP entry, Zod validation, file upload, produces Redis jobs | Render (Web Service) |
+| worker | Python 3.11 | BRPOP consumer loop, PDF extraction, LLM call, writes results to PostgreSQL | Render (Background Worker) |
+| redis | Render Key Value (Valkey, Redis-compatible) | Async job queue between api and worker | Render |
+| db | PostgreSQL | Shared persistent store for job state and results | Neon (serverless Postgres) |
+| frontend | React + Vite | User interface | Vercel |
+
+
+Locally, all four backend services run together via Docker Compose with 
+containerized Postgres and Redis — see Getting Started below. In production, 
+the database and cache are decoupled onto managed platforms rather than 
+self-hosted in containers.
 
 The LLM system instruction enforces binary keyword evaluation, X-Y-Z bullet 
 formatting, and a 25-word conciseness constraint. Calibrated against Malaysian 
@@ -124,6 +131,27 @@ docker-compose up --build
 
 API available at `http://localhost:3000`  
 Frontend available at `http://localhost:5173`
+
+---
+
+## Deployment
+
+Production runs across three platforms instead of Docker Compose:
+
+- **Neon** — managed serverless PostgreSQL, replaces the local `db` container
+- **Render** — hosts the API as a Web Service, the worker as a Background 
+  Worker, and Redis as a Key Value instance
+- **Vercel** — hosts the built frontend
+
+The API and worker share the same `DATABASE_URL` (Neon) and `REDIS_URL` 
+(Render Key Value, internal connection string). The worker also requires 
+`GEMINI_API_KEY` set directly in its Render environment. The frontend requires 
+`VITE_API_URL` pointing at the deployed API's public Render URL, and the API 
+requires `FRONTEND_URL` pointing back at the deployed Vercel URL for CORS.
+
+Render's free tier does not support Background Worker services — the worker 
+runs on Render's Starter tier ($7/month), since a continuously-polling 
+consumer process cannot run on infrastructure designed to sleep when idle.
 
 ---
 
