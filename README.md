@@ -4,7 +4,7 @@ A polyglot distributed system that helps Malaysian CS students
 identify ATS keyword gaps between their CV and a job posting, with 
 copy-paste ready bullet point rewrites.
 
-**Live URL:** https://cv-analyzer-eight-tau.vercel.app/
+**Live URL:** https://cv-analyzer-eight-tau.vercel.app
 
 ---
 
@@ -48,6 +48,7 @@ The LLM system instruction enforces binary keyword evaluation, X-Y-Z bullet
 formatting, and a 25-word conciseness constraint. Calibrated against Malaysian 
 tech recruiter screening standards.
 
+
 ### Why async via Redis instead of synchronous LLM calls
 
 PDF extraction plus LLM generation takes 10–30 seconds per request. Calling 
@@ -61,6 +62,7 @@ three conditions:
 - **Rate limit bursts:** 50 simultaneous submissions would fire 50 concurrent 
   Gemini API calls, hitting 429s immediately. Redis smooths traffic to a 
   controlled consumption rate.
+
 
 ### Why DB write happens before Redis push
 
